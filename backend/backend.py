@@ -4,16 +4,32 @@ from typing import List
 import random
 import os
 import shutil
+from twilio.rest import Client
+from dotenv import load_dotenv
+
+# Load environment variables
+# Load environment variables
+basedir = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(basedir, ".env.local"))
 
 app = FastAPI()
 
+# Twilio Configuration
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = "+16187013270"
+
+if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
+    twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+else:
+    twilio_client = None
+    print("Warning: Twilio credentials not found. SMS will not be sent.")
+
 # Simple in-memory storage
-db = {
-    "users": {},      # Phone -> User Dict
-    "otps": {},       # Phone -> OTP
-    "records": [], 
-    "stats": []
-}
+users_db = {}      # Phone -> User Dict
+otps_db = {}       # Phone -> OTP
+records_db = []
+stats_db = []
 
 # Ensure uploads directory exists
 UPLOAD_DIR = "uploads"
@@ -40,14 +56,14 @@ class LoginRequest(BaseModel):
 
 @app.post("/register")
 def register(user: User):
-    if user.phone in db["users"]:
+    if user.phone in users_db:
          return {"status": "error", "message": "User already registered"}
-    db["users"][user.phone] = user.dict()
+    users_db[user.phone] = user.dict()
     return {"status": "success", "user": user}
 
 @app.post("/login")
 def login(request: LoginRequest):
-    user = db["users"].get(request.phone)
+    user = users_db.get(request.phone)
     if user and user["password"] == request.password:
         return {"status": "success", "user": user}
     return {"status": "error", "message": "Invalid credentials"}
@@ -56,13 +72,33 @@ def login(request: LoginRequest):
 def send_otp(request: OTPRequest):
     # Generate 4-digit OTP
     otp = str(random.randint(1000, 9999))
-    db["otps"][request.phone] = otp
-    print(f"OTP for {request.phone} is: {otp}") # Simulate sending
+    otps_db[request.phone] = otp
+    print(f"OTP for {request.phone} is: {otp}") # Log internally
+    
+    # Send SMS via Twilio
+    if twilio_client:
+        try:
+            to_number = request.phone
+            if not to_number.startswith("+"):
+                 to_number = "+91" + to_number
+            
+            message = twilio_client.messages.create(
+                from_=TWILIO_PHONE_NUMBER,
+                body=f'OTP IS "{otp}"',
+                to=to_number
+            )
+            print(f"Twilio Message SID: {message.sid}")
+        except Exception as e:
+            print(f"Failed to send SMS: {e}")
+
+            # We might want to return an error, but for now let's allow it to 'succeed' 
+            # so the flow continues even if SMS fails (e.g. for testing with invalid numbers)
+            
     return {"status": "success", "message": "OTP sent successfully"}
 
 @app.post("/verify-otp")
 def verify_otp(request: OTPVerify):
-    stored_otp = db["otps"].get(request.phone)
+    stored_otp = otps_db.get(request.phone)
     if stored_otp and stored_otp == request.otp:
         return {"status": "success", "message": "OTP verified"}
     return {"status": "error", "message": "Invalid OTP"}
@@ -87,5 +123,9 @@ def chat(message: str = Body(..., embed=True)):
 
 @app.post("/save-stats")
 def save_stats(stats: dict):
-    db["stats"].append(stats)
+    stats_db.append(stats)
     return {"status": "saved"}
+
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}

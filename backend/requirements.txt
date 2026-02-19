@@ -4,3 +4,5 @@ streamlit
 requests
 matplotlib
 python-multipart
+twilio
+python-dotenv
