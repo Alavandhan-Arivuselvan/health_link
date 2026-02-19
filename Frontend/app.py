@@ -3,6 +3,9 @@ import random
 import time
 import matplotlib.pyplot as plt
 from datetime import date
+import socket
+import qrcode
+from io import BytesIO
 
 # -------------------- CONFIG --------------------
 st.set_page_config(
@@ -104,10 +107,11 @@ if st.session_state.logged_in:
         "📁 Records",
         "❤️ Stats",
         "⌚ Watch",
+        "📱 QR Download",
         "🚪 Logout"
     ]
 else:
-    pages = ["🔐 Login", "📝 Register"]
+    pages = ["🔐 Login", "📝 Register", "📱 QR Download"]
 
 if "page" not in st.session_state:
     st.session_state.page = pages[0]
@@ -331,6 +335,43 @@ elif page == "📈 Graph":
     ax.set_ylabel("BPM")
 
     st.pyplot(fig)
+
+
+# ==============================================================
+# QR DOWNLOAD
+# ==============================================================
+
+elif page == "📱 QR Download":
+
+    st.markdown('<div class="app-title">📱 Get Mobile App</div>', unsafe_allow_html=True)
+    st.markdown('<div class="glass-card">', unsafe_allow_html=True)
+
+    try:
+        # Get Local IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        
+        url = f"https://drive.google.com/uc?export=download&id=1fglybOu_F533MEhVVB0uXvD2r-xydHZ0"
+        
+        st.info(f"Scan to download:\n1. Ensure phone is on same WiFi as PC\n2. Scan QR Code below")
+        
+        # Generate QR
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(url)
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convert to bytes for streamlit
+        buf = BytesIO()
+        img.save(buf)
+        st.image(buf.getvalue(), caption=url, width=300)
+        
+    except Exception as e:
+        st.error(f"Could not generate QR Code: {e}")
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ==============================================================

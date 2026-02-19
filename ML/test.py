@@ -13,14 +13,12 @@ print("Model loaded — ready to predict")
 
 test_data = pd.DataFrame([
     # Change these numbers to your real watch averages or new test cases
-    {'Age': 32, 'Sleep Duration': 6.8, 'Quality of Sleep': 6,
-     'Physical Activity Level': 35, 'Stress Level': 6,
-     'Heart Rate': 78, 'Daily Steps': 5200},
+    {'Age': 19, 'Sleep Duration': 1.5, 'Quality of Sleep': 1.5,
+     'Heart Rate': 90, 'Daily Steps': 1200},
      
     # Add more rows if you want
-    {'Age': 45, 'Sleep Duration': 5.5, 'Quality of Sleep': 4,
-     'Physical Activity Level': 20, 'Stress Level': 8,
-     'Heart Rate': 92, 'Daily Steps': 3500},
+    {'Age': 30, 'Sleep Duration': 8, 'Quality of Sleep': 8,
+     'Heart Rate': 75, 'Daily Steps': 12500},
 ], columns=features)   # ← important: match exact column order
 
 # Predict
