@@ -1,6 +1,6 @@
 
 from fastapi.testclient import TestClient
-from backend import app
+from .backend import app
 import os
 import shutil
 
@@ -11,13 +11,20 @@ def test_flow():
     otp = None
 
     print("\n--- 1. Testing Register ---")
-    response = client.post("/register", json={"name": "Test User", "phone": phone, "age": 25})
+    response = client.post("/register", json={
+        "name": "Test User", 
+        "phone": phone, 
+        "dob": "1990-01-01",
+        "gender": "Male",
+        "blood_group": "O+",
+        "password": "password123"
+    })
     print(f"Register Response: {response.json()}")
     assert response.status_code == 200
     assert response.json()["status"] == "success"
 
     print("\n--- 2. Testing Login ---")
-    response = client.post("/login", json={"phone": phone})
+    response = client.post("/login", json={"phone": phone, "password": "password123"})
     print(f"Login Response: {response.json()}")
     assert response.status_code == 200
     assert response.json()["user"]["name"] == "Test User"

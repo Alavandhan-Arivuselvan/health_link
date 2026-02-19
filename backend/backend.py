@@ -22,7 +22,10 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 class User(BaseModel):
     name: str
     phone: str
-    age: int
+    dob: str
+    gender: str
+    blood_group: str
+    password: str
 
 class OTPRequest(BaseModel):
     phone: str
@@ -33,6 +36,7 @@ class OTPVerify(BaseModel):
 
 class LoginRequest(BaseModel):
     phone: str
+    password: str
 
 @app.post("/register")
 def register(user: User):
@@ -44,9 +48,9 @@ def register(user: User):
 @app.post("/login")
 def login(request: LoginRequest):
     user = db["users"].get(request.phone)
-    if user:
+    if user and user["password"] == request.password:
         return {"status": "success", "user": user}
-    return {"status": "error", "message": "User not found"}
+    return {"status": "error", "message": "Invalid credentials"}
 
 @app.post("/send-otp")
 def send_otp(request: OTPRequest):
