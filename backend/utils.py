@@ -248,8 +248,8 @@ def generate_patient_graph(user_phone, output_file="healthlink_interactive.html"
         print(f"❌ No data found for {user_phone}.")
         return None
 
-    net = Network(height="850px", width="100%", bgcolor="#0b0f19", font_color="white", heading="HealthLink: Semantic Patient Knowledge Graph")
-    net.set_options('{"interaction": { "hover": true, "zoomView": true }, "physics": {"forceAtlas2Based": {"gravitationalConstant": -150, "centralGravity": 0.02, "springLength": 100}}}')
+    net = Network(height="100vh", width="100%", bgcolor="#0b0f19", font_color="white")
+    net.set_options('{"interaction": { "hover": true, "zoomView": true, "navigationButtons": true }, "physics": {"forceAtlas2Based": {"gravitationalConstant": -150, "centralGravity": 0.02, "springLength": 100, "springConstant": 0.05}, "solver": "forceAtlas2Based", "stabilization": {"iterations": 150}}}')
 
     profile = user_doc.get("profile", {})
     patient_name = profile.get("full_name") or "Unknown Patient"
@@ -345,9 +345,23 @@ def generate_patient_graph(user_phone, output_file="healthlink_interactive.html"
         });
     </script>
     """
+    # Post-process: inject custom JS and fix HTML for full-viewport mobile display
+    css_injection = """
+    <style>
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #0b0f19; }
+        #mynetwork { width: 100%; height: 100vh; background-color: #0b0f19; border: none; }
+        .card { margin: 0; padding: 0; border: none; height: 100%; }
+        h1, center { display: none; }
+    </style>
+    """
     with open(output_file, "r+", encoding="utf-8") as f:
         html_content = f.read()
+        # Inject hover/blur JS before </body>
         html_content = html_content.replace("</body>", js_injection + "\n</body>")
+        # Inject full-viewport CSS into <head>
+        html_content = html_content.replace("</head>", css_injection + "\n</head>")
+        # Remove the broken lib/bindings/utils.js reference (causes 404)
+        html_content = html_content.replace('<script src="lib/bindings/utils.js"></script>', '')
         f.seek(0)
         f.write(html_content)
         f.truncate()

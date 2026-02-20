@@ -5,7 +5,7 @@ import { StyleSheet, Platform, View, Text } from 'react-native';
 const API_URL =
   Platform.OS === 'web'
     ? 'http://localhost:9000'
-    : 'http://192.168.137.90:9000';
+    : 'http://10.67.77.22:9000';
 
 const GRAPH_URL = `${API_URL}/graph`;
 
