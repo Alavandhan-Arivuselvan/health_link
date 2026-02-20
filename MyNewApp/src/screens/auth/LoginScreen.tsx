@@ -7,6 +7,7 @@ import CustomButton from '../../components/CustomButton';
 import { authAPI } from '../../services/api';
 import { theme } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = () => {
     const navigation = useNavigation();
@@ -49,10 +50,11 @@ const LoginScreen = () => {
         try {
             const response = await authAPI.verifyOTP({ phone, otp });
             if (response.data.status === 'success') {
+                await AsyncStorage.setItem('user_phone', phone);
                 // Navigate to Home
                 navigation.reset({
                     index: 0,
-                    routes: [{ name: 'AppTabs' }],
+                    routes: [{ name: 'AppTabs' as never }],
                 });
             } else {
                 Alert.alert('Verification Failed', response.data.message);

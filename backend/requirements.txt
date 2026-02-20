@@ -6,3 +6,9 @@ matplotlib
 python-multipart
 twilio
 python-dotenv
+pdf2image
+pytesseract
+pymongo
+sentence-transformers
+huggingface-hub
+pyvis

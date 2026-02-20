@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text } from 'react-native';
 import ChatScreen from '../screens/home/ChatScreen';
 import WebScreen from '../screens/home/WebScreen';
+import IngestScreen from '../screens/home/IngestScreen';
 import StatsScreen from '../screens/home/StatsScreen';
 import { theme } from '../theme';
 
@@ -11,7 +12,7 @@ const Tab = createBottomTabNavigator();
 
 // Placeholder icon component until vector icons are installed
 const TabIcon = ({ name, color }: { name: string, color: string }) => (
-    <Text style={{ color, fontSize: 18, fontWeight: 'bold' }}>{name[0]}</Text>
+    <Text style={{ color, fontSize: 18, fontWeight: 'bold' as const }}>{name[0]}</Text>
 );
 
 const AppTabs = () => {
@@ -34,9 +35,11 @@ const AppTabs = () => {
         >
             <Tab.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: 'Chat' }} />
             <Tab.Screen name="Web" component={WebScreen} options={{ tabBarLabel: 'Visualize' }} />
+            <Tab.Screen name="Upload" component={IngestScreen} options={{ tabBarLabel: 'Upload' }} />
             <Tab.Screen name="Stats" component={StatsScreen} options={{ tabBarLabel: 'Stats' }} />
         </Tab.Navigator>
     );
 };
 
 export default AppTabs;
+

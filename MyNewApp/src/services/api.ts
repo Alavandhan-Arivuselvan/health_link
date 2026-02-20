@@ -8,21 +8,22 @@ const BASE_URL = "http://10.67.77.22:9000";
 console.log('API Base URL configured as:', BASE_URL);
 
 // Helper to mimic Axios response structure
-const fetchClient = async (endpoint: string, options: RequestInit = {}) => {
+const fetchClient = async (endpoint: string, options: RequestInit & { isFormData?: boolean } = {}) => {
     const url = `${BASE_URL}${endpoint}`;
+    const { isFormData, ...restOptions } = options as any;
 
     const headers: any = {
         'Content-Type': 'application/json',
-        ...(options.headers || {}),
+        ...(restOptions.headers || {}),
     };
 
-    // If body is FormData, let the browser set Content-Type (with boundary)
-    if (options.body instanceof FormData) {
+    // If body is FormData, let fetch set the multipart Content-Type with boundary
+    if (isFormData) {
         delete headers['Content-Type'];
     }
 
     const config = {
-        ...options,
+        ...restOptions,
         headers,
     };
 
@@ -63,8 +64,8 @@ export const chatAPI = {
     uploadFile: (formData: FormData) => fetchClient('/upload', {
         method: 'POST',
         body: formData,
-        // No Content-Type header here, fetchClient handles FormData
-    }),
+        isFormData: true,
+    } as any),
 };
 
 export const statsAPI = {

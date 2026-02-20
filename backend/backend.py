@@ -1,9 +1,12 @@
-from fastapi import FastAPI, Body, UploadFile, File, HTTPException
+from fastapi import FastAPI, Body, UploadFile, File, Form, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import random
 import os
 import shutil
+from utils import pipline
 from twilio.rest import Client
 from dotenv import load_dotenv
 
@@ -13,6 +16,14 @@ basedir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(basedir, ".env.local"))
 
 app = FastAPI()
+
+# Allow all origins for development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Twilio Configuration
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
@@ -32,7 +43,7 @@ records_db = []
 stats_db = []
 
 # Ensure uploads directory exists
-UPLOAD_DIR = "uploads"
+UPLOAD_DIR = "doc"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 class User(BaseModel):
@@ -104,11 +115,15 @@ def verify_otp(request: OTPVerify):
     return {"status": "error", "message": "Invalid OTP"}
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), user_phone: str = Form("")):
+    if not (file.content_type.startswith("image/") or file.content_type == "application/pdf"):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only PDF and Images are allowed.")
+    
     file_path = os.path.join(UPLOAD_DIR, file.filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    return {"status": "success", "filename": file.filename}
+    pipline(os.path.join(basedir, "doc"), user_phone)
+    return {"status": "success", "filename": file.filename, "path": file_path}
 
 @app.post("/chat")
 def chat(message: str = Body(..., embed=True)):
@@ -129,3 +144,8 @@ def save_stats(stats: dict):
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
+
+@app.get("/graph")
+def get_graph():
+    html_path = os.path.join(basedir, "healthlink_interactive.html")
+    return FileResponse(html_path, media_type="text/html")

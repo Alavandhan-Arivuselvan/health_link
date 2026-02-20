@@ -12,15 +12,21 @@ print("Model loaded — ready to predict")
 # ────────────────────────────────────────────────
 
 test_data = pd.DataFrame([
-    # Change these numbers to your real watch averages or new test cases
-    {'Age': 32, 'Sleep Duration': 6.8, 'Quality of Sleep': 6,
-     'Physical Activity Level': 35, 'Stress Level': 6,
-     'Heart Rate': 78, 'Daily Steps': 5200},
-     
-    # Add more rows if you want
-    {'Age': 45, 'Sleep Duration': 5.5, 'Quality of Sleep': 4,
-     'Physical Activity Level': 20, 'Stress Level': 8,
-     'Heart Rate': 92, 'Daily Steps': 3500},
+    {'Age': 22, 'Sleep Duration': 7.5, 'Quality of Sleep': 8.0, 'Heart Rate': 62, 'Daily Steps': 10500},
+    {'Age': 31, 'Sleep Duration': 6.0, 'Quality of Sleep': 5.0, 'Heart Rate': 74, 'Daily Steps': 8200},
+    {'Age': 58, 'Sleep Duration': 6.5, 'Quality of Sleep': 6.0, 'Heart Rate': 68, 'Daily Steps': 4100},
+    {'Age': 20, 'Sleep Duration': 4.0, 'Quality of Sleep': 3.0, 'Heart Rate': 85, 'Daily Steps': 2100},
+    {'Age': 35, 'Sleep Duration': 8.0, 'Quality of Sleep': 9.0, 'Heart Rate': 58, 'Daily Steps': 12000},
+    {'Age': 42, 'Sleep Duration': 5.0, 'Quality of Sleep': 4.5, 'Heart Rate': 80, 'Daily Steps': 3800},
+    {'Age': 27, 'Sleep Duration': 7.0, 'Quality of Sleep': 7.0, 'Heart Rate': 72, 'Daily Steps': 9000},
+    {'Age': 65, 'Sleep Duration': 7.5, 'Quality of Sleep': 8.5, 'Heart Rate': 64, 'Daily Steps': 5500},
+    {'Age': 18, 'Sleep Duration': 9.0, 'Quality of Sleep': 9.5, 'Heart Rate': 55, 'Daily Steps': 15000},
+    {'Age': 50, 'Sleep Duration': 4.5, 'Quality of Sleep': 2.0, 'Heart Rate': 88, 'Daily Steps': 1500},
+    {'Age': 29, 'Sleep Duration': 6.5, 'Quality of Sleep': 6.0, 'Heart Rate': 76, 'Daily Steps': 7400},
+    {'Age': 38, 'Sleep Duration': 7.2, 'Quality of Sleep': 7.5, 'Heart Rate': 70, 'Daily Steps': 11000},
+    {'Age': 47, 'Sleep Duration': 5.8, 'Quality of Sleep': 4.0, 'Heart Rate': 82, 'Daily Steps': 4500},
+    {'Age': 24, 'Sleep Duration': 3.5, 'Quality of Sleep': 2.5, 'Heart Rate': 90, 'Daily Steps': 3200},
+    {'Age': 33, 'Sleep Duration': 8.2, 'Quality of Sleep': 8.0, 'Heart Rate': 60, 'Daily Steps': 13500}
 ], columns=features)   # ← important: match exact column order
 
 # Predict
