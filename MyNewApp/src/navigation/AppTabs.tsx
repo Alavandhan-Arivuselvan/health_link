@@ -5,7 +5,7 @@ import { Text } from 'react-native';
 import ChatScreen from '../screens/home/ChatScreen';
 import WebScreen from '../screens/home/WebScreen';
 import IngestScreen from '../screens/home/IngestScreen';
-import StatsScreen from '../screens/home/StatsScreen';
+import HealthDashboard from '../../app/chart';
 import { theme } from '../theme';
 
 const Tab = createBottomTabNavigator();
@@ -36,7 +36,7 @@ const AppTabs = () => {
             <Tab.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: 'Chat' }} />
             <Tab.Screen name="Web" component={WebScreen} options={{ tabBarLabel: 'Visualize' }} />
             <Tab.Screen name="Upload" component={IngestScreen} options={{ tabBarLabel: 'Upload' }} />
-            <Tab.Screen name="Stats" component={StatsScreen} options={{ tabBarLabel: 'Stats' }} />
+            <Tab.Screen name="Stats" component={HealthDashboard} options={{ tabBarLabel: 'Stats' }} />
         </Tab.Navigator>
     );
 };

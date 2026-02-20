@@ -221,7 +221,7 @@ export default function HealthDashboard() {
   const [loading, setLoading] = useState<boolean>(true);
 
   // Use your local IP for physical devices, or 10.0.2.2 for Android Emulator
-  const API_URL = `http://172.16.23.234:8000/api/health-stats/${selectedWeek}`;
+  const API_URL = `http://10.67.77.22:9000/api/health-stats/${selectedWeek}`;
 
   const fetchData = async () => {
     setLoading(true);
