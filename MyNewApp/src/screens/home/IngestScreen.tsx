@@ -71,10 +71,16 @@ const IngestScreen = () => {
                 }
                 formData.append("user_phone", userPhone);
 
+                // 5 minute timeout for OCR processing
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+
                 const response = await fetch(`${API_URL}/upload`, {
                     method: "POST",
                     body: formData,
+                    signal: controller.signal,
                 });
+                clearTimeout(timeoutId);
                 body = await response.text();
                 status = response.status;
             } else {
@@ -106,7 +112,7 @@ const IngestScreen = () => {
             arr.push(selectedFile.name);
             await AsyncStorage.setItem("records", JSON.stringify(arr));
 
-            Alert.alert("Success", "File uploaded to backend ✅");
+            Alert.alert("Success", "File uploaded! Processing in background. Check Visualize tab shortly. ✅");
             setSelectedFile(null);
         } catch (error) {
             console.log("Upload exception:", error);

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Body, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, Body, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -6,7 +6,7 @@ from typing import List
 import random
 import os
 import shutil
-from utils import pipline
+from utils import process_medical_file,start_interactive_chat
 from twilio.rest import Client
 from dotenv import load_dotenv
 
@@ -129,15 +129,17 @@ def verify_otp(request: OTPVerify):
     return {"status": "error", "message": "Invalid OTP"}
 
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...), user_phone: str = Form("")):
+async def upload_file(file: UploadFile = File(...), user_phone: str = Form(""), background_tasks: BackgroundTasks = None):
     if not (file.content_type.startswith("image/") or file.content_type == "application/pdf"):
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDF and Images are allowed.")
     
     file_path = os.path.join(UPLOAD_DIR, file.filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    pipline(os.path.join(basedir, "doc"), user_phone)
-    return {"status": "success", "filename": file.filename, "path": file_path}
+    
+    # Process in background so the response returns immediately
+    background_tasks.add_task(process_medical_file, user_phone, file_path)
+    return {"status": "processing", "filename": file.filename, "path": file_path, "message": "File uploaded. Processing in background."}
 
 health_records = {
     "past": [
@@ -215,15 +217,12 @@ def calculate_weekly_risk(week_data):
 
 
 @app.post("/chat")
-def chat(message: str = Body(..., embed=True)):
+def chat(payload: dict = Body(...)):
+    user_phone = payload.get("user_phone", "")
+    message = payload.get("message", "")
     text = message.lower()
-    if "fever" in text:
-        reply = "Backend Analysis: Stay hydrated and monitor temperature."
-    elif "headache" in text:
-        reply = "Backend Analysis: Rest and check your blood pressure."
-    else:
-        reply = "This response came from your FastAPI backend!"
-    return {"reply": reply}
+    ans = start_interactive_chat(user_phone, text)
+    return {"reply": ans}
 
 @app.post("/save-stats")
 def save_stats(stats: dict):

@@ -60,7 +60,7 @@ export const authAPI = {
 };
 
 export const chatAPI = {
-    sendMessage: (message: string) => fetchClient('/chat', { method: 'POST', body: JSON.stringify({ message }) }),
+    sendMessage: (message: string, user_phone: string = "") => fetchClient('/chat', { method: 'POST', body: JSON.stringify({ message, user_phone }) }),
     uploadFile: (formData: FormData) => fetchClient('/upload', {
         method: 'POST',
         body: formData,

@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { View, StyleSheet, Text, FlatList, TextInput, TouchableOpacity, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import GradientBackground from '../../components/GradientBackground';
 import { theme } from '../../theme';
 import { chatAPI } from '../../services/api';
@@ -20,7 +21,8 @@ const ChatScreen = () => {
         setInputText('');
 
         try {
-            const response = await chatAPI.sendMessage(newMsg.text);
+            const userPhone = (await AsyncStorage.getItem("user_phone")) || "";
+            const response = await chatAPI.sendMessage(newMsg.text, userPhone);
             const botMsg = { id: (Date.now() + 1).toString(), text: response.data.reply, sender: 'bot' as const };
             setMessages(prev => [...prev, botMsg]);
         } catch (error) {
