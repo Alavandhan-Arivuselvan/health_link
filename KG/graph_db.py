@@ -25,61 +25,88 @@ class GraphDB:
             result = session.run(query, parameters)
             return list(result)
 
-    def create_patient(self, name="Unknown", age=None, gender=None):
+    def create_patient(self, name, age, gender):
         query = """
         MERGE (p:Patient)
-        SET p.name = $name,
-            p.age = $age,
-            p.gender = $gender
-        RETURN p
+        SET p.name=$name, p.age=$age, p.gender=$gender
         """
         return self.run_query(query, {
             "name": name,
             "age": age,
             "gender": gender
         })
-
+    
     def create_visit(self, date, doc_id):
         query = """
-        CREATE (v:Visit {
-            date: $date,
-            doc_id: $doc_id
-        })
-        RETURN v
+        MERGE (v:Visit {doc_id: $doc_id})
+        SET v.date = $date
         """
         return self.run_query(query, {
             "date": date,
             "doc_id": doc_id
         })
 
-    def link_patient_visit(self):
+    def link_patient_visit(self, doc_id):
         query = """
-        MATCH (p:Patient), (v:Visit)
-        WHERE NOT (p)-[:HAD_VISIT]->(v)
-        CREATE (p)-[:HAD_VISIT]->(v)
+        MATCH (p:Patient)
+        MATCH (v:Visit {doc_id:$doc_id})
+        MERGE (p)-[:HAD_VISIT]->(v)
         """
-        return self.run_query(query)
+        return self.run_query(query, {"doc_id": doc_id})
     
-    def attach_hospital_to_visit(self, hospital_name):
+    def attach_hospital_to_visit(self, doc_id, hospital):
         query = """
-        MATCH (v:Visit)
-        MERGE (h:Hospital {name: $hospital})
+        MATCH (v:Visit {doc_id:$doc_id})
+        MERGE (h:Hospital {name:$hospital})
         MERGE (v)-[:AT]->(h)
-        RETURN h
         """
-        return self.run_query(query, {"hospital": hospital_name})
-
-
-
+        return self.run_query(query,{
+            "doc_id":doc_id,
+            "hospital":hospital
+        })
+    
+    def attach_conditions(self, doc_id, diagnoses):
+        query = """
+        MATCH (v:Visit {doc_id:$doc_id})
+        UNWIND $diags AS d
+        MERGE (c:Condition {name:d})
+        MERGE (v)-[:DIAGNOSED_WITH]->(c)
+        """
+        return self.run_query(query,{
+            "doc_id":doc_id,
+            "diags":diagnoses
+        })
+    
+    def attach_medications(self, doc_id, meds):
+        query = """
+        MATCH (v:Visit {doc_id:$doc_id})
+        UNWIND $meds AS m
+        MERGE (med:Medication {name:m.name})
+        MERGE (v)-[r:PRESCRIBED]->(med)
+        SET r.dosage=m.dosage, r.frequency=m.frequency
+        """
+        return self.run_query(query,{
+            "doc_id":doc_id,
+            "meds":meds
+        })
+    
 if __name__ == "__main__":
     db = GraphDB()
 
-    db.create_patient("Agiless", 22, "Unknown")
-    db.create_visit("2026-02-22", "doc_test_1")
-    db.link_patient_visit()
-    
-    db.attach_hospital_to_visit("Wearable ML Engine")
+    doc_id="doc_test_1"
 
-    print("Patient → Visit → Hospital created!")
+    db.create_patient("Agiless",22,"Unknown")
+    db.create_visit("2026-02-22",doc_id)
+    db.link_patient_visit(doc_id)
 
+    db.attach_hospital_to_visit(doc_id,"Wearable ML Engine")
+
+    db.attach_conditions(doc_id,[
+        "Diabetes Mellitus",
+        "Elevated Heart Risk Detected"
+    ])
+
+    db.attach_medications(doc_id,[
+        {"name":"Metformin","dosage":"500mg","frequency":"Twice Daily"}
+    ])
     db.close()
