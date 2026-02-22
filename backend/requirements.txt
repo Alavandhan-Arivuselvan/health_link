@@ -12,3 +12,5 @@ pymongo
 sentence-transformers
 huggingface-hub
 pyvis
+supabase
+bcrypt

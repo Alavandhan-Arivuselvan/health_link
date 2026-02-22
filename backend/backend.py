@@ -6,8 +6,10 @@ from typing import List
 import random
 import os
 import shutil
-from utils import process_medical_file,start_interactive_chat
+from utils import process_medical_file, start_interactive_chat
 from twilio.rest import Client
+from supabase import create_client, Client as SupabaseClient
+import bcrypt
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -40,9 +42,23 @@ else:
     twilio_client = None
     print("Warning: Twilio credentials not found. SMS will not be sent.")
 
-# Simple in-memory storage
-users_db = {}      # Phone -> User Dict
-otps_db = {}       # Phone -> OTP
+# Supabase cloud database
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase: SupabaseClient = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print(f"✅ Supabase connected: {SUPABASE_URL}")
+else:
+    supabase = None
+    print("⚠️  Warning: SUPABASE_URL / SUPABASE_KEY not set. DB will not work.")
+
+# Helper: hash and verify passwords
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(password: str, hashed: str) -> bool:
+    return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+
 records_db = []
 stats_db = []
 
@@ -68,6 +84,22 @@ class User(BaseModel):
     blood_group: str
     password: str
 
+class Doctor(BaseModel):
+    name: str
+    phone: str
+    dob: str
+    gender: str
+    license_number: str
+    specialization: str
+    experience: int
+    hospital: str
+    fee: float = 0.0
+    password: str
+
+class DoctorLoginRequest(BaseModel):
+    license_number: str
+    password: str
+
 class OTPRequest(BaseModel):
     phone: str
 
@@ -81,24 +113,60 @@ class LoginRequest(BaseModel):
 
 @app.post("/register")
 def register(user: User):
-    if user.phone in users_db:
-         return {"status": "error", "message": "User already registered"}
-    users_db[user.phone] = user.dict()
-    return {"status": "success", "user": user}
+    # Check if user already exists
+    existing = supabase.table("users").select("id").eq("phone", user.phone).execute()
+    if existing.data:
+        return {"status": "error", "message": "User already registered"}
+    
+    user_data = user.dict()
+    user_data["password"] = hash_password(user_data["password"])
+    result = supabase.table("users").insert(user_data).execute()
+    
+    # Return user without password hash
+    safe_user = {k: v for k, v in result.data[0].items() if k != "password"}
+    return {"status": "success", "user": safe_user}
 
 @app.post("/login")
 def login(request: LoginRequest):
-    user = users_db.get(request.phone)
-    if user and user["password"] == request.password:
-        return {"status": "success", "user": user}
+    result = supabase.table("users").select("*").eq("phone", request.phone).execute()
+    if result.data:
+        user = result.data[0]
+        if verify_password(request.password, user["password"]):
+            safe_user = {k: v for k, v in user.items() if k != "password"}
+            return {"status": "success", "user": safe_user}
     return {"status": "error", "message": "Invalid credentials"}
+
+@app.post("/doctor/register")
+def doctor_register(doctor: Doctor):
+    existing = supabase.table("doctors").select("id").eq("license_number", doctor.license_number).execute()
+    if existing.data:
+        return {"status": "error", "message": "Doctor already registered with this license number"}
+    
+    doctor_data = doctor.dict()
+    doctor_data["password"] = hash_password(doctor_data["password"])
+    result = supabase.table("doctors").insert(doctor_data).execute()
+    
+    safe_doctor = {k: v for k, v in result.data[0].items() if k != "password"}
+    return {"status": "success", "doctor": safe_doctor}
+
+@app.post("/doctor/login")
+def doctor_login(request: DoctorLoginRequest):
+    result = supabase.table("doctors").select("*").eq("license_number", request.license_number).execute()
+    if result.data:
+        doctor = result.data[0]
+        if verify_password(request.password, doctor["password"]):
+            safe_doctor = {k: v for k, v in doctor.items() if k != "password"}
+            return {"status": "success", "doctor": safe_doctor}
+    return {"status": "error", "message": "Invalid license number or password"}
 
 @app.post("/send-otp")
 def send_otp(request: OTPRequest):
     # Generate 4-digit OTP
     otp = str(random.randint(1000, 9999))
-    otps_db[request.phone] = otp
-    print(f"OTP for {request.phone} is: {otp}") # Log internally
+    
+    # Upsert into otps table (replace if phone already has an OTP)
+    supabase.table("otps").upsert({"phone": request.phone, "otp": otp}, on_conflict="phone").execute()
+    print(f"OTP for {request.phone} is: {otp}")  # Log internally
     
     # Send SMS via Twilio
     if twilio_client:
@@ -115,16 +183,15 @@ def send_otp(request: OTPRequest):
             print(f"Twilio Message SID: {message.sid}")
         except Exception as e:
             print(f"Failed to send SMS: {e}")
-
-            # We might want to return an error, but for now let's allow it to 'succeed' 
-            # so the flow continues even if SMS fails (e.g. for testing with invalid numbers)
             
     return {"status": "success", "message": "OTP sent successfully"}
 
 @app.post("/verify-otp")
 def verify_otp(request: OTPVerify):
-    stored_otp = otps_db.get(request.phone)
-    if stored_otp and stored_otp == request.otp:
+    result = supabase.table("otps").select("otp").eq("phone", request.phone).execute()
+    if result.data and result.data[0]["otp"] == request.otp:
+        # Delete OTP after successful verification
+        supabase.table("otps").delete().eq("phone", request.phone).execute()
         return {"status": "success", "message": "OTP verified"}
     return {"status": "error", "message": "Invalid OTP"}
 
@@ -248,3 +315,13 @@ async def get_stats(week_type: str):
         "analysis": risk_analysis
     }
 
+@app.post("/qr")
+def get_qr(payload: dict = Body(...)):
+    user_phone = payload.get("user_phone", "")
+    # Generate a URL pointing to this user's health profile
+    qr_url = f"http://{os.environ.get('HOST_IP', '192.168.1.100')}:9000/profile/{user_phone}"
+    return {"url": qr_url, "user_phone": user_phone}
+
+@app.get("/profile/{phone}")
+def get_profile(phone: str):
+    return {"message": f"Health profile for {phone}", "phone": phone}

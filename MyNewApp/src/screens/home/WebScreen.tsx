@@ -1,30 +1,22 @@
 
 import React from 'react';
 import { StyleSheet, Platform, View, Text } from 'react-native';
+import { BASE_URL } from '../../config/host';
+import { theme } from '../../theme';
+import { Ionicons } from '@expo/vector-icons';
 
-const API_URL =
-  Platform.OS === 'web'
-    ? 'http://localhost:9000'
-    : 'http://10.67.77.22:9000';
-
-const GRAPH_URL = `${API_URL}/graph`;
+const GRAPH_URL = `${BASE_URL}/graph`;
 
 const WebScreen = () => {
   if (Platform.OS === 'web') {
-    // On web, use an iframe to render the interactive HTML graph
     return (
       <View style={styles.container}>
         <iframe
           src={GRAPH_URL}
           style={{
             position: 'absolute' as const,
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            width: '100%',
-            height: '100%',
-            border: 'none',
+            top: 0, left: 0, right: 0, bottom: 0,
+            width: '100%', height: '100%', border: 'none',
           }}
           title="HealthLink Knowledge Graph"
         />
@@ -32,7 +24,6 @@ const WebScreen = () => {
     );
   }
 
-  // On native, try using react-native-webview
   try {
     const { WebView } = require('react-native-webview');
     return (
@@ -44,16 +35,19 @@ const WebScreen = () => {
       />
     );
   } catch (e) {
-    // Fallback if react-native-webview is not installed
     return (
       <View style={styles.fallback}>
-        <Text style={styles.fallbackTitle}>📊 Knowledge Graph</Text>
+        <View style={styles.iconCircle}>
+          <Ionicons name="stats-chart" size={36} color={theme.colors.accent} />
+        </View>
+        <Text style={styles.fallbackTitle}>Knowledge Graph</Text>
         <Text style={styles.fallbackText}>
           Install react-native-webview to view the interactive graph on mobile.
         </Text>
-        <Text style={styles.fallbackUrl}>
-          Or open in browser: {GRAPH_URL}
-        </Text>
+        <View style={styles.urlBox}>
+          <Text style={styles.urlLabel}>GRAPH URL</Text>
+          <Text style={styles.fallbackUrl} selectable>{GRAPH_URL}</Text>
+        </View>
       </View>
     );
   }
@@ -62,30 +56,55 @@ const WebScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.bgDark,
   },
   fallback: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0b0f19',
-    padding: 20,
+    backgroundColor: theme.colors.bgDark,
+    padding: 24,
+  },
+  iconCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: theme.colors.glassLight,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: theme.spacing.m,
   },
   fallbackTitle: {
-    fontSize: 22,
-    fontWeight: '700' as const,
-    color: 'white',
-    marginBottom: 12,
-  },
-  fallbackText: {
-    color: '#94a3b8',
-    fontSize: 14,
-    textAlign: 'center',
+    ...theme.typography.h2,
     marginBottom: 10,
   },
-  fallbackUrl: {
-    color: '#38bdf8',
-    fontSize: 13,
+  fallbackText: {
+    color: theme.colors.textMuted,
+    fontSize: 14,
     textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  urlBox: {
+    backgroundColor: theme.colors.bgCard,
+    padding: 16,
+    borderRadius: theme.borderRadius.m,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  urlLabel: {
+    color: theme.colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    marginBottom: 6,
+  } as any,
+  fallbackUrl: {
+    color: theme.colors.accent,
+    fontSize: 13,
   },
 });
 

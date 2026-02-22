@@ -41,3 +41,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Auto-generated host config (machine-specific LAN IP)
+src/config/host.ts

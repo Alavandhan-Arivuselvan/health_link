@@ -463,6 +463,8 @@ def update_vector_store(user_phone, parsed_json, doc_date):
 # =========================================================
 # 5. STEP 4: GENERATE PYVIS GRAPH
 # =========================================================
+
+
 def generate_patient_graph(user_phone, output_file="healthlink_interactive.html"):
     print(f"🕸️ Generating semantic graph for {user_phone}...")
     user_doc = db["users"].find_one({"_id": user_phone})
@@ -470,53 +472,45 @@ def generate_patient_graph(user_phone, output_file="healthlink_interactive.html"
         print(f"❌ No data found for {user_phone}.")
         return None
 
-    net = Network(height="100vh", width="100%", bgcolor="#0b0f19", font_color="white")
-    net.set_options('{"interaction": { "hover": true, "zoomView": true, "navigationButtons": true }, "physics": {"forceAtlas2Based": {"gravitationalConstant": -150, "centralGravity": 0.02, "springLength": 100, "springConstant": 0.05}, "solver": "forceAtlas2Based", "stabilization": {"iterations": 150}}}')
-
-    profile = user_doc.get("profile") or {}
-
-    # 🔥 THE BULLETPROOF NAME FIX 🔥
-    raw_name = profile.get("full_name")
+    net = Network(height="100vh", width="100vw", bgcolor="#0b0f19", font_color="white", heading="HealthLink: Semantic Patient Knowledge Graph")
     
-    if isinstance(raw_name, list):  
-        raw_name = raw_name[0] if raw_name else "Unknown Patient"
-        
-    patient_name = str(raw_name).strip() if raw_name else "Unknown Patient"
-    
-    if patient_name.lower() in ["none", "null", ""]:
-        patient_name = "Unknown Patient"
+    # Enable native hover and dragging
+    net.set_options("""
+    {
+      "interaction": { "hover": true, "dragNodes": true, "zoomView": true }, 
+      "physics": {
+          "forceAtlas2Based": {"gravitationalConstant": -100, "centralGravity": 0.01, "springLength": 100},
+          "minVelocity": 0.75,
+          "solver": "forceAtlas2Based"
+      }
+    }
+    """)
 
-    p_age = str(profile.get("age", "N/A"))
-    p_gender = str(profile.get("gender", "N/A"))
+    profile = user_doc.get("profile", {})
+    patient_name = profile.get("full_name", "Unknown Patient")
+    p_age = profile.get("age", "N/A")
+    p_gender = profile.get("gender", "N/A")
 
-    patient_tooltip = f"""<div style="font-family: Arial; padding: 10px; background: #1e293b; border-radius: 8px; border: 1px solid #334155;"><h3 style="margin:0 0 5px 0; color: #38bdf8;">{patient_name}</h3><b>Age:</b> {p_age} <br><b>Gender:</b> {p_gender} <br><b>ID:</b> {user_phone}</div>"""
-    
+    # 🔥 FIX 1: Plain text Patient Tooltip
+    patient_tooltip = f"👤 PATIENT PROFILE\n====================\nName: {patient_name}\nAge: {p_age}\nGender: {p_gender}\nID: {user_phone}"
     net.add_node(patient_name, label=patient_name, title=patient_tooltip, color="#ef4444", size=40, shape="diamond")
     
     timeline = user_doc.get("timeline", {})
-    
-    # 🔥 UPDATED COLOR MAP FOR NEW SYMPTOMS AND LABS
-    color_map = {
-        "Diagnosis": "#f97316", 
-        "Medication": "#06b6d4", 
-        "Vital": "#a855f7", 
-        "Symptom": "#ef4444", 
-        "Lab Result": "#10b981", 
-        "Other": "#8b5cf6"
-    }
+    color_map = {"Diagnosis": "#f97316", "Medication": "#06b6d4", "Vital": "#a855f7", "Other": "#8b5cf6"}
 
-    # 🔥 THE RESTORED TIMELINE LOOP 🔥
     for date_str in sorted(timeline.keys()):
-        hospital = timeline[date_str].get("meta", {}).get("primary_hospital", "Unknown Hospital")
+        data = timeline[date_str]
+        hospital = data.get("meta", {}).get("primary_hospital", "Unknown Hospital")
         date_node_id = f"DATE_{date_str}"
-        date_tooltip = f"<div style='padding:5px;'><b>Visit Date:</b> {date_str}<br><b>Facility:</b> {hospital}</div>"
+        
+        # 🔥 FIX 2: Plain text Date Tooltip
+        date_tooltip = f"🏥 VISIT DETAILS\n--------------------\nDate: {date_str}\nFacility: {hospital}"
         
         net.add_node(date_node_id, label=date_str, title=date_tooltip, color="#eab308", size=25, shape="hexagon")
         net.add_edge(patient_name, date_node_id, color="#475569", width=2)
 
-        events = timeline[date_str].get("clinical_events", [])
         categorized = {}
-        for ev in events:
+        for ev in data.get("clinical_events", []):
             if isinstance(ev, dict):
                 categorized.setdefault(ev.get("category", "Other"), []).append(ev)
 
@@ -528,90 +522,64 @@ def generate_patient_graph(user_phone, output_file="healthlink_interactive.html"
             
             for item in items:
                 item_name = str(item.get("item", "Unknown")).upper()
-                global_item_id = f"GLOBAL_{category}_{item_name}"
-                hover_details = "".join([f"<b>{k.title()}</b>: {v}<br>" for k, v in item.items() if k not in ["category", "item", "source_doc_id"]])
-                item_tooltip = f"""<div style="font-family: Arial; padding: 8px; background: #0f172a; border-radius: 5px; border: 1px solid {cat_color};"><span style="color: {cat_color}; font-weight: bold;">{item_name}</span><br><hr style="border-color: #334155; margin: 5px 0;"><span style="font-size: 13px;">{hover_details}</span></div>"""
+                global_item_id = f"GLOBAL_{category}{item_name}{date_str}"
+                
+                # 🔥 FIX 3: Plain text Item Tooltip with bullet points
+                hover_details = "\n".join([f"• {k.title()}: {v}" for k, v in item.items() if k not in ["category", "item", "source_doc_id"]])
+                item_tooltip = f"📌 {item_name}\n--------------------\n{hover_details}"
                 
                 net.add_node(global_item_id, label=item_name, title=item_tooltip, color=cat_color, size=12, shape="dot")
                 net.add_edge(cat_node_id, global_item_id, color=cat_color, width=1.5)
 
     net.save_graph(output_file)
 
-    js_injection = """
+    # Clean, lightweight JS just for the neighbor highlight (no tooltip hijacking!)
+    safe_injection = """
     <script type="text/javascript">
         network.on("hoverNode", function (params) {
-            var hover_id = params.node;
-            var connected_nodes = network.getConnectedNodes(hover_id);
-            connected_nodes.push(hover_id);
-            var all_nodes = nodes.get();
-            var node_updates = [];
-            for (var i = 0; i < all_nodes.length; i++) {
-                var node = all_nodes[i];
-                if (node.original_color === undefined) { node.original_color = node.color; }
-                if (connected_nodes.includes(node.id)) {
-                    node_updates.push({id: node.id, color: node.original_color, font: {color: 'white'}});
-                } else {
-                    node_updates.push({id: node.id, color: 'rgba(50,50,50,0.2)', font: {color: 'rgba(255,255,255,0.05)'}});
-                }
-            }
-            nodes.update(node_updates);
-            var connected_edges = network.getConnectedEdges(hover_id);
-            var all_edges = edges.get();
-            var edge_updates = [];
-            for (var i = 0; i < all_edges.length; i++) {
-                var edge = all_edges[i];
-                if (edge.original_color === undefined) { edge.original_color = edge.color || '#475569'; }
-                if (connected_edges.includes(edge.id)) {
-                    edge_updates.push({id: edge.id, color: '#94a3b8', width: 3});
-                } else {
-                    edge_updates.push({id: edge.id, color: 'rgba(50,50,50,0.1)', width: 1});
-                }
-            }
-            edges.update(edge_updates);
+            try {
+                network.canvas.body.container.style.cursor = 'pointer';
+                var hover_id = params.node;
+                var connected_nodes = network.getConnectedNodes(hover_id);
+                connected_nodes.push(hover_id);
+                
+                var updateArray = [];
+                nodes.forEach(function(node) {
+                    if (!node.hiddenColor) { node.hiddenColor = node.color; }
+                    if (connected_nodes.includes(node.id)) {
+                        updateArray.push({id: node.id, color: node.hiddenColor, font: {color: 'white'}});
+                    } else {
+                        updateArray.push({id: node.id, color: 'rgba(50,50,50,0.3)', font: {color: 'rgba(50,50,50,0.3)'}});
+                    }
+                });
+                nodes.update(updateArray);
+            } catch (err) { }
         });
+
         network.on("blurNode", function (params) {
-            var all_nodes = nodes.get();
-            var node_updates = [];
-            for (var i = 0; i < all_nodes.length; i++) {
-                if (all_nodes[i].original_color !== undefined) {
-                    node_updates.push({id: all_nodes[i].id, color: all_nodes[i].original_color, font: {color: 'white'}});
-                }
-            }
-            nodes.update(node_updates);
-            var all_edges = edges.get();
-            var edge_updates = [];
-            for (var i = 0; i < all_edges.length; i++) {
-                if (all_edges[i].original_color !== undefined) {
-                    edge_updates.push({id: all_edges[i].id, color: all_edges[i].original_color, width: (all_edges[i].dashes ? 1 : 2)});
-                }
-            }
-            edges.update(edge_updates);
+            try {
+                network.canvas.body.container.style.cursor = 'default';
+                var updateArray = [];
+                nodes.forEach(function(node) {
+                    if (node.hiddenColor) {
+                        updateArray.push({id: node.id, color: node.hiddenColor, font: {color: 'white'}});
+                    }
+                });
+                nodes.update(updateArray);
+            } catch (err) { }
         });
     </script>
     """
     
-    css_injection = """
-    <style>
-        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #0b0f19; }
-        #mynetwork { width: 100%; height: 100vh; background-color: #0b0f19; border: none; }
-        .card { margin: 0; padding: 0; border: none; height: 100%; }
-        h1, center { display: none; }
-    </style>
-    """
-    
     with open(output_file, "r+", encoding="utf-8") as f:
         html_content = f.read()
-        html_content = html_content.replace("</body>", js_injection + "\n</body>")
-        html_content = html_content.replace("</head>", css_injection + "\n</head>")
-        html_content = html_content.replace('<script src="lib/bindings/utils.js"></script>', '')
+        html_content = html_content.replace("</body>", safe_injection + "\n</body>")
         f.seek(0)
         f.write(html_content)
         f.truncate()
 
     print(f"🎉 Fully Styled Graph saved to {output_file}")
     return output_file
-
-
 # =========================================================
 
 # 6. STEP 5: RAG CHATBOT ENGINE
