@@ -18,3 +18,5 @@ backend/__pycache__/
 Frontend/__pycache__/
 backend/demo.html
 backend/run_backend.bat
+ML/fitbit_2weeks_data.json
+ML/toke.txt
