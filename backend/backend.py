@@ -478,7 +478,7 @@ def get_fitbit_insights():
     }
 
 
-@app.post("/api/fitbit-refresh")
+@app.post("/api/fitbit-refresh")#hi
 def refresh_fitbit_data():
     """
     Re-run final_fetch.py to pull fresh data from Fitbit API
