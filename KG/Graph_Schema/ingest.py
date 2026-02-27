@@ -1,20 +1,8 @@
 """
 ingest.py — Pass 1 ingestion pipeline.
-
-Orchestrates:
-  1. Read report file
-  2. Fetch existing canonicals from graph (for LLM context)
-  3. LLM extraction
-  4. Write all nodes and edges to Neo4j
-  5. Trigger Pass 2 analysis (imported separately)
-
-Usage:
-  python ingest.py --type medical --file reports/report_2025_01_15.txt --date 2025-01-15
-  python ingest.py --type scan    --file scans/chest_xray_2025_01_15.txt --date 2025-01-15 --modality "Chest X-Ray" --body-part chest
-  python ingest.py --type wearable --file wearables/2025_01_15.json --date 2025-01-15
+Handles .txt and .pdf files for medical and scan reports.
 """
 
-import argparse
 import json
 import sys
 from datetime import datetime
@@ -29,12 +17,49 @@ from config import DATE_FORMAT
 # FILE READERS
 # ─────────────────────────────────────────────
 
-def read_text_file(path: str) -> str:
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read().strip()
+def read_file(path: str) -> str:
+    """
+    Read a file and return its text content.
+    Handles both .txt and .pdf files automatically.
+    """
+    p = Path(path)
+
+    if p.suffix.lower() == ".pdf":
+        return read_pdf(path)
+    else:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read().strip()
+        except UnicodeDecodeError:
+            with open(path, "r", encoding="latin-1") as f:
+                return f.read().strip()
 
 
-def read_json_file(path: str) -> dict | list:
+def read_pdf(path: str) -> str:
+    """Extract text from a PDF using pymupdf (pip install pymupdf)."""
+    try:
+        import fitz  # pymupdf
+    except ImportError:
+        print("\n  ✗ pymupdf is not installed. Run: pip install pymupdf")
+        sys.exit(1)
+
+    doc = fitz.open(path)
+    page_count = doc.page_count
+    pages_text = [page.get_text() for page in doc]
+    doc.close()
+
+    full_text = "\n".join(pages_text).strip()
+
+    if not full_text:
+        print("  ⚠ PDF appears to be scanned (image-only) — no text extracted.")
+        print("  Please use a digitally created PDF or convert it to text first.")
+        sys.exit(1)
+
+    print(f"  ✓ PDF read: {page_count} pages, {len(full_text)} chars")
+    return full_text
+
+
+def read_json_file(path: str):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -49,44 +74,40 @@ def ingest_medical_report(file_path: str, date: str):
     print(f"Date: {date}")
     print('='*50)
 
-    # Step 1: Read report
-    text = read_text_file(file_path)
+    print("\n-> Reading file...")
+    text = read_file(file_path)
+    if not text:
+        print("✗ File is empty.")
+        return
 
-    # Step 2: Get existing canonicals from graph (prevents name drift)
-    print("\n→ Fetching existing canonicals from graph...")
+    print("\n-> Fetching existing canonicals from graph...")
     existing = graph_db.get_existing_canonicals()
     print(f"  Found: {len(existing['tests'])} tests, {len(existing['drugs'])} drugs, {len(existing['diagnoses'])} diagnoses")
 
-    # Step 3: LLM extraction
-    print("\n→ Extracting with LLM...")
+    print("\n-> Extracting with LLM...")
     extracted = extract_medical_report(text, existing, date)
 
     if not extracted:
-        print("✗ Extraction failed. Aborting.")
+        print("✗ Extraction failed.")
         return
 
-    # Step 4: Ensure Visit + MedicalData container exist
     graph_db.upsert_visit(date)
     graph_db.upsert_medical_data_container(date)
 
-    # Step 5: Upsert patient profile (updates if new info found)
     profile = extracted.get("patient_profile", {})
-    if profile and any(v for v in profile.values()):
+    if profile and any(v for v in profile.values() if v):
         graph_db.upsert_patient_profile(profile)
 
-    # Step 6: Lab results
     lab_results = extracted.get("lab_results", [])
     if lab_results:
-        print(f"\n→ Writing {len(lab_results)} lab results...")
+        print(f"\n-> Writing {len(lab_results)} lab results...")
         for lr in lab_results:
-            # Ensure TestType canonical node exists
             graph_db.upsert_test_type(
                 canonical_id=lr["canonical_id"],
                 display_name=lr["display_name"],
                 unit=lr.get("unit"),
                 normal_range=lr.get("normal_range")
             )
-            # Insert the dated LabResult + TREND_OF link
             graph_db.insert_lab_result(
                 date=date,
                 test_canonical_id=lr["canonical_id"],
@@ -96,10 +117,9 @@ def ingest_medical_report(file_path: str, date: str):
                 status=lr.get("status", "")
             )
 
-    # Step 7: Prescriptions
     prescriptions = extracted.get("prescriptions", [])
     if prescriptions:
-        print(f"\n→ Writing {len(prescriptions)} prescriptions...")
+        print(f"\n-> Writing {len(prescriptions)} prescriptions...")
         for rx in prescriptions:
             graph_db.insert_prescription(
                 date=date,
@@ -109,10 +129,9 @@ def ingest_medical_report(file_path: str, date: str):
                 canonical_drug_id=rx["canonical_drug_id"]
             )
 
-    # Step 8: Diagnoses
     diagnoses = extracted.get("diagnoses", [])
     if diagnoses:
-        print(f"\n→ Writing {len(diagnoses)} diagnoses...")
+        print(f"\n-> Writing {len(diagnoses)} diagnoses...")
         for dx in diagnoses:
             graph_db.insert_diagnosis(
                 date=date,
@@ -121,11 +140,10 @@ def ingest_medical_report(file_path: str, date: str):
                 icd_code=dx.get("icd_code")
             )
 
-    # Step 9: Print notes
     if extracted.get("raw_notes"):
-        print(f"\n⚠ Notes from extractor: {extracted['raw_notes']}")
+        print(f"\n  Notes: {extracted['raw_notes']}")
 
-    print(f"\n✓ Medical report ingested successfully for {date}")
+    print(f"\n✓ Medical report ingested for {date}")
     return extracted
 
 
@@ -133,38 +151,34 @@ def ingest_medical_report(file_path: str, date: str):
 # SCAN REPORT INGESTION
 # ─────────────────────────────────────────────
 
-def ingest_scan_report(file_path: str, date: str, modality: str, body_part: str = None):
+def ingest_scan_report(file_path: str, date: str, modality: str = None, body_part: str = None):
     print(f"\n{'='*50}")
-    print(f"INGESTING SCAN REPORT: {file_path}")
-    print(f"Date: {date} | Modality: {modality} | Body: {body_part}")
+    print(f"INGESTING SCAN on {date} (modality: {modality or 'auto-detect'})")
     print('='*50)
 
-    text = read_text_file(file_path)
+    print("\n-> Reading file...")
+    text = read_file(file_path)
 
-    print("\n→ Fetching existing canonicals...")
+    print("\n-> Fetching existing canonicals...")
     existing = graph_db.get_existing_canonicals()
 
-    print("\n→ Extracting scan findings with LLM...")
+    print("\n-> Extracting with LLM...")
     extracted = extract_scan_report(text, existing, date, modality, body_part)
 
     if not extracted:
-        print("✗ Scan extraction failed. Aborting.")
+        print("✗ Extraction failed.")
         return
 
-    # Ensure Visit exists
     graph_db.upsert_visit(date)
-
-    # Create Scan container
     scan_id = graph_db.upsert_scan_container(
         date=date,
         modality=extracted.get("modality", modality),
         body_part=extracted.get("body_part", body_part)
     )
 
-    # Insert findings
     findings = extracted.get("findings", [])
     if findings:
-        print(f"\n→ Writing {len(findings)} findings...")
+        print(f"\n-> Writing {len(findings)} findings...")
         for f in findings:
             graph_db.insert_finding(
                 scan_id=scan_id,
@@ -174,9 +188,9 @@ def ingest_scan_report(file_path: str, date: str, modality: str, body_part: str 
             )
 
     if extracted.get("raw_notes"):
-        print(f"\n⚠ Notes: {extracted['raw_notes']}")
+        print(f"\n  Notes: {extracted['raw_notes']}")
 
-    print(f"\n✓ Scan ingested successfully for {date}")
+    print(f"\n✓ Scan ingested for {date}")
     return extracted
 
 
@@ -184,34 +198,216 @@ def ingest_scan_report(file_path: str, date: str, modality: str, body_part: str 
 # WEARABLE DATA INGESTION
 # ─────────────────────────────────────────────
 
-"""
-Expected wearable JSON format:
-{
-  "device": "Apple Watch Series 9",
-  "date": "2025-01-15",
-  "metrics": [
-    {"metric_name": "Heart Rate", "canonical_id": "heart_rate", "value": 72, "unit": "bpm", "aggregation": "daily_avg"},
-    {"metric_name": "SpO2",       "canonical_id": "spo2",       "value": 97, "unit": "%",   "aggregation": "daily_avg"},
-    {"metric_name": "Steps",      "canonical_id": "steps",      "value": 8432, "unit": "steps", "aggregation": "daily_total"},
-    {"metric_name": "Heart Rate", "canonical_id": "heart_rate", "value": 145, "unit": "bpm",
-     "timestamp": "2025-01-15T09:32:00", "aggregation": "raw"}
-  ]
-}
-"""
+def parse_fitbit_custom_format(data: dict) -> list:
+    """
+    Parser for the custom Fitbit export format:
+    {
+      "period": "...",
+      "steps": {"2026-02-14": 10676, ...},
+      "heart_rate": {
+        "daily_summaries": {"2026-02-14": {"resting_bpm": 71, "zones": [...]}},
+        "intraday_minute_level": {"2026-02-14": [{"time": "05:10:00", "bpm": 94}, ...]}
+      },
+      "sleep": {
+        "daily_sleep": {"2026-02-14": {"hours_asleep": ..., "minutes_asleep": ..., ...}}
+      }
+    }
+    Returns list of daily records in our standard format.
+    """
+    by_date = {}
+
+    def add(date, metric_name, canonical_id, value, unit, aggregation, timestamp=None):
+        if date not in by_date:
+            by_date[date] = []
+        entry = {
+            "metric_name": metric_name,
+            "canonical_id": canonical_id,
+            "value": float(value),
+            "unit": unit,
+            "aggregation": aggregation
+        }
+        if timestamp:
+            entry["timestamp"] = timestamp
+        by_date[date].append(entry)
+
+    # ── Steps ──────────────────────────────────
+    steps = data.get("steps", {})
+    for date, count in steps.items():
+        if count is not None:
+            add(date, "Steps", "steps", count, "steps", "daily_total")
+
+    # ── Heart Rate ─────────────────────────────
+    hr_data = data.get("heart_rate", {})
+
+    # Daily summaries: resting BPM + zone minutes
+    daily_hr = hr_data.get("daily_summaries", {})
+    for date, summary in daily_hr.items():
+        resting = summary.get("resting_bpm")
+        if resting is not None:
+            add(date, "Resting Heart Rate", "resting_heart_rate", resting, "bpm", "daily_avg")
+
+        zones = summary.get("zones", [])
+        for zone in zones:
+            zone_name = zone.get("name", "")
+            minutes = zone.get("minutes")
+            if minutes is None:
+                continue
+            name_map = {
+                "Out of Range": ("HR Out of Range Minutes", "hr_out_of_range_min", "min"),
+                "Fat Burn":     ("HR Fat Burn Zone Minutes", "hr_fat_burn_min", "min"),
+                "Cardio":       ("HR Cardio Zone Minutes", "hr_cardio_min", "min"),
+                "Peak":         ("HR Peak Zone Minutes", "hr_peak_min", "min"),
+            }
+            if zone_name in name_map:
+                display, canonical, unit = name_map[zone_name]
+                add(date, display, canonical, minutes, unit, "daily_total")
+
+    # Intraday: raw minute-level BPM (store as individual raw metrics)
+    intraday = hr_data.get("intraday_minute_level", {})
+    for date, readings in intraday.items():
+        if not isinstance(readings, list):
+            continue
+        # Compute daily avg/min/max from intraday
+        bpms = [r["bpm"] for r in readings if "bpm" in r and r["bpm"] is not None]
+        if bpms:
+            add(date, "Heart Rate", "heart_rate", round(sum(bpms)/len(bpms), 1), "bpm", "daily_avg")
+            add(date, "Heart Rate", "heart_rate", min(bpms), "bpm", "daily_min")
+            add(date, "Heart Rate", "heart_rate", max(bpms), "bpm", "daily_max")
+
+    # ── Sleep ──────────────────────────────────
+    sleep_data = data.get("sleep", {})
+    daily_sleep = sleep_data.get("daily_sleep", {})
+
+    for date, sleep in daily_sleep.items():
+        hours = sleep.get("hours_asleep")
+        if hours is not None:
+            add(date, "Sleep Duration", "sleep_duration", hours, "hours", "daily_total")
+
+        efficiency = sleep.get("efficiency_percent")
+        if efficiency is not None:
+            add(date, "Sleep Efficiency", "sleep_efficiency", efficiency, "%", "daily_avg")
+
+        time_in_bed = sleep.get("time_in_bed_minutes")
+        if time_in_bed is not None:
+            add(date, "Time in Bed", "time_in_bed", time_in_bed, "min", "daily_total")
+
+        stages = sleep.get("stages", {})
+        stage_map = {
+            "deep":  ("Deep Sleep", "sleep_deep", "min"),
+            "light": ("Light Sleep", "sleep_light", "min"),
+            "rem":   ("REM Sleep", "sleep_rem", "min"),
+            "wake":  ("Wake During Sleep", "sleep_wake", "min"),
+        }
+        for stage_key, (display, canonical, unit) in stage_map.items():
+            stage = stages.get(stage_key, {})
+            mins = stage.get("minutes")
+            if mins is not None:
+                add(date, display, canonical, mins, unit, "daily_total")
+
+    # Build output records
+    records = []
+    for date in sorted(by_date.keys()):
+        records.append({
+            "device": "Fitbit",
+            "date": date,
+            "metrics": by_date[date]
+        })
+
+    return records
+
+
+def normalize_wearable_json(data, default_date: str) -> list:
+    """
+    Auto-detect wearable JSON format and normalize into our standard format.
+    Handles:
+      - Our format: {"device":..., "date":..., "metrics": [...]}
+      - This Fitbit format: {"period":..., "steps":{}, "heart_rate":{}, "sleep":{}}
+      - Flat dict: {"heart_rate": 72, "steps": 8000}
+      - List of records
+    """
+    if not isinstance(data, dict):
+        return []
+
+    # Already our format
+    if "metrics" in data:
+        return [data]
+
+    # This Fitbit custom export format
+    if "steps" in data and "heart_rate" in data:
+        print("  ✓ Detected: Fitbit custom export format")
+        return parse_fitbit_custom_format(data)
+
+    # List of daily records
+    if isinstance(data, list):
+        records = []
+        for item in data:
+            records.extend(normalize_wearable_json(item, default_date))
+        return records
+
+    # Generic flat dict — supports multiple naming conventions for the same metric
+    generic_map = {
+        # Heart rate variants
+        "heart_rate":           ("Heart Rate", "heart_rate", "bpm", "daily_avg"),
+        "heart_rate_avg":       ("Heart Rate", "heart_rate", "bpm", "daily_avg"),
+        "resting_heart_rate":   ("Resting Heart Rate", "resting_heart_rate", "bpm", "daily_avg"),
+        "heart_rate_resting":   ("Resting Heart Rate", "resting_heart_rate", "bpm", "daily_avg"),
+        # Steps variants
+        "steps":                ("Steps", "steps", "steps", "daily_total"),
+        "steps_total":          ("Steps", "steps", "steps", "daily_total"),
+        # Sleep variants
+        "sleep_hours":          ("Sleep Duration", "sleep_duration", "hours", "daily_total"),
+        "sleep_duration":       ("Sleep Duration", "sleep_duration", "hours", "daily_total"),
+        "sleep_asleep_minutes": ("Sleep Duration", "sleep_duration", "min", "daily_total"),
+        "sleep_efficiency":     ("Sleep Efficiency", "sleep_efficiency", "%", "daily_avg"),
+        "sleep_deep_minutes":   ("Deep Sleep", "sleep_deep", "min", "daily_total"),
+        "sleep_rem_minutes":    ("REM Sleep", "sleep_rem", "min", "daily_total"),
+        "sleep_light_minutes":  ("Light Sleep", "sleep_light", "min", "daily_total"),
+        # Other metrics
+        "spo2":                 ("SpO2", "spo2", "%", "daily_avg"),
+        "weight":               ("Body Weight", "body_weight", "kg", "raw"),
+        "bmi":                  ("BMI", "bmi", "", "raw"),
+        "calories":             ("Calories", "calories", "kcal", "daily_total"),
+        "calories_total":       ("Calories", "calories", "kcal", "daily_total"),
+        "active_minutes":       ("Active Minutes", "active_minutes", "min", "daily_total"),
+        "stress_score":         ("Stress Score", "stress_score", "", "daily_avg"),
+    }
+    metrics = []
+    entry_date = data.get("date", default_date)
+    for key, (display, canonical, unit, agg) in generic_map.items():
+        if key in data:
+            try:
+                metrics.append({
+                    "metric_name": display,
+                    "canonical_id": canonical,
+                    "value": float(data[key]),
+                    "unit": unit,
+                    "aggregation": agg
+                })
+            except (ValueError, TypeError):
+                pass
+    if metrics:
+        return [{"device": "unknown", "date": entry_date, "metrics": metrics}]
+
+    return []
+
 
 def ingest_wearable_data(file_path: str, date: str):
     print(f"\n{'='*50}")
-    print(f"INGESTING WEARABLE DATA: {file_path}")
-    print(f"Date: {date}")
+    print(f"INGESTING WEARABLE DATA for {date}")
     print('='*50)
 
-    data = read_json_file(file_path)
+    raw_data = read_json_file(file_path)
 
-    # Support both direct dict and list of daily records
-    if isinstance(data, list):
-        records = data
-    else:
-        records = [data]
+    print("\n-> Normalizing wearable format...")
+    records = normalize_wearable_json(raw_data, date)
+
+    if not records:
+        print("  ✗ Could not parse wearable JSON.")
+        print("  Supported formats: our format, Fitbit export, flat daily dict.")
+        return
+
+    total_metrics = sum(len(r.get("metrics", [])) for r in records)
+    print(f"  ✓ Found {len(records)} day(s), {total_metrics} metric entries")
 
     for record in records:
         record_date = record.get("date", date)
@@ -219,78 +415,9 @@ def ingest_wearable_data(file_path: str, date: str):
         metrics = record.get("metrics", [])
 
         if not metrics:
-            print(f"  ⚠ No metrics in record for {record_date}")
             continue
 
         graph_db.upsert_visit(record_date)
         graph_db.batch_insert_wearable_metrics(record_date, metrics, device)
 
-    print(f"\n✓ Wearable data ingested.")
-
-
-# ─────────────────────────────────────────────
-# CLI ENTRY POINT
-# ─────────────────────────────────────────────
-
-def main():
-    parser = argparse.ArgumentParser(description="Health Knowledge Graph - Pass 1 Ingestor")
-    parser.add_argument("--type",      required=True,  choices=["medical", "scan", "wearable"],
-                        help="Type of data to ingest")
-    parser.add_argument("--file",      required=True,  help="Path to input file")
-    parser.add_argument("--date",      required=False, help="Report date (YYYY-MM-DD). Defaults to today.")
-    parser.add_argument("--modality",  required=False, help="Scan modality (e.g. 'Chest X-Ray', 'MRI Brain')")
-    parser.add_argument("--body-part", required=False, help="Body part imaged")
-    parser.add_argument("--no-analysis", action="store_true",
-                        help="Skip Pass 2 analysis after ingestion")
-
-    args = parser.parse_args()
-
-    # Default date to today
-    date = args.date or datetime.now().strftime(DATE_FORMAT)
-
-    # Validate date format
-    try:
-        datetime.strptime(date, DATE_FORMAT)
-    except ValueError:
-        print(f"✗ Invalid date format: {date}. Use YYYY-MM-DD.")
-        sys.exit(1)
-
-    # Validate file exists
-    if not Path(args.file).exists():
-        print(f"✗ File not found: {args.file}")
-        sys.exit(1)
-
-    # Setup graph constraints on first run
-    graph_db.setup_constraints()
-
-    # Run appropriate ingestor
-    if args.type == "medical":
-        ingest_medical_report(args.file, date)
-
-    elif args.type == "scan":
-        if not args.modality:
-            print("✗ --modality is required for scan ingestion (e.g. 'Chest X-Ray')")
-            sys.exit(1)
-        ingest_scan_report(args.file, date, args.modality, args.body_part)
-
-    elif args.type == "wearable":
-        ingest_wearable_data(args.file, date)
-
-    # Pass 2: run analysis after ingestion (unless skipped)
-    if not args.no_analysis:
-        try:
-            from analysis import run_analysis_pass
-            print(f"\n{'='*50}")
-            print("RUNNING PASS 2: ANALYSIS")
-            print('='*50)
-            run_analysis_pass(date)
-        except ImportError:
-            print("\n⚠ analysis.py not found — skipping Pass 2 (build it next)")
-        except Exception as e:
-            print(f"\n⚠ Pass 2 failed: {e} — ingestion data is safe in graph")
-
-    graph_db.close()
-
-
-if __name__ == "__main__":
-    main()
+    print(f"\n✓ Wearable data ingested: {len(records)} day(s).")

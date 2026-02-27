@@ -209,27 +209,14 @@ def test_connections():
     # Test Gemini
     info("Connecting to Gemini...")
     try:
-        import google.generativeai as genai
-        GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-        genai.configure(api_key=GEMINI_API_KEY)
-
-        m = genai.GenerativeModel("gemini-3-flash-preview")
-        m.generate_content("Say OK")
+        from google import genai as genai_sdk
+        c = genai_sdk.Client(api_key=os.environ["GEMINI_API_KEY"])
+        c.models.generate_content(model="gemini-2.0-flash", contents="Say OK")
         success("Gemini connected.")
     except Exception as e:
         error(f"Gemini connection failed: {e}")
-        print("\n  Check your Gemini API key and try again.")
-        # Try fallback model
-        try:
-            info("Trying gemini-1.5-flash as fallback...")
-            m = genai.GenerativeModel("gemini-1.5-flash")
-            m.generate_content("Say OK")
-            # Update config to use fallback
-            os.environ["GEMINI_MODEL_OVERRIDE"] = "gemini-1.5-flash"
-            success("gemini-1.5-flash works. Will use this model.")
-        except Exception as e2:
-            error(f"Fallback also failed: {e2}")
-            sys.exit(1)
+        print("\n  Check your Gemini API key at: aistudio.google.com")
+        sys.exit(1)
 
 
 # ─────────────────────────────────────────────
@@ -242,8 +229,6 @@ def main_menu():
         "Ingest a medical report (lab results, prescriptions, diagnoses)",
         "Ingest a scan report (X-Ray, MRI, CT, Ultrasound)",
         "Ingest wearable data (heart rate, steps, SpO2, etc.)",
-        "Run analysis on existing graph data",
-        "Ingest all sample data (for testing)",
         "Exit"
     ])
 
@@ -308,43 +293,45 @@ def flow_medical():
     info(f"Ingesting {file_path} for {date}...")
     from ingest import ingest_medical_report
     ingest_medical_report(file_path, date)
-
-    if confirm("Run analysis after ingestion?"):
-        flow_analysis(anchor_date=date)
+    flow_analysis(anchor_date=date)
 
 
 def flow_scan():
     section("Ingest Scan Report")
-    file_path = pick_file("scan report (.txt)", [".txt"])
+    file_path = pick_file("scan report (.txt or .pdf)", [".txt", ".pdf"])
     date = pick_date("Scan date")
-
-    modality = choose("Scan type:", [
-        "Chest X-Ray",
-        "MRI Brain",
-        "MRI Spine",
-        "CT Abdomen",
-        "CT Chest",
-        "Ultrasound Abdomen",
-        "Ultrasound Pelvis",
-        "DEXA Scan",
-        "Other (type manually)"
-    ])
-
-    if modality == "Other (type manually)":
-        modality = ask("Enter scan type")
-
-    body_part = ask("Body part (optional, press Enter to skip)")
 
     if not Path(file_path).exists():
         error(f"File not found: {file_path}")
         return
 
-    info(f"Ingesting scan: {modality} on {date}...")
-    from ingest import ingest_scan_report
-    ingest_scan_report(file_path, date, modality, body_part or None)
+    # Modality is optional — LLM will detect it from the report if skipped
+    print("\n  Scan type (press Enter to let the AI detect it from the report):")
+    print("    1. Chest X-Ray       4. CT Abdomen        7. Ultrasound Pelvis")
+    print("    2. MRI Brain         5. CT Chest          8. DEXA Scan")
+    print("    3. MRI Spine         6. Ultrasound Abdomen  9. Other")
+    raw = input("\n  Enter number or press Enter to skip: ").strip()
 
-    if confirm("Run analysis after ingestion?"):
-        flow_analysis(anchor_date=date)
+    modality_map = {
+        "1": "Chest X-Ray", "2": "MRI Brain", "3": "MRI Spine",
+        "4": "CT Abdomen",  "5": "CT Chest",  "6": "Ultrasound Abdomen",
+        "7": "Ultrasound Pelvis", "8": "DEXA Scan"
+    }
+
+    if raw == "":
+        modality = None
+        info("Modality not specified — AI will detect from report content.")
+    elif raw == "9":
+        modality = ask("Enter scan type manually") or None
+    elif raw in modality_map:
+        modality = modality_map[raw]
+    else:
+        modality = raw or None
+
+    info(f"Ingesting scan on {date} (modality: {modality or 'auto-detect'})...")
+    from ingest import ingest_scan_report
+    ingest_scan_report(file_path, date, modality, None)
+    flow_analysis(anchor_date=date)
 
 
 def flow_wearable():
@@ -375,66 +362,42 @@ def flow_wearable():
     info(f"Ingesting wearable data for {date}...")
     from ingest import ingest_wearable_data
     ingest_wearable_data(file_path, date)
-
-    if confirm("Run analysis after ingestion?"):
-        flow_analysis(anchor_date=date)
+    flow_analysis(anchor_date=date)
 
 
 def flow_analysis(anchor_date=None):
     section("Run Analysis")
 
-    if not anchor_date:
-        anchor_date = pick_date("Analysis anchor date (analysis looks 90 days back from this)")
+    # Automatically use the full span of data in the graph — no prompting needed
+    import graph_db
+    with graph_db.driver.session() as session:
+        result = session.run("""
+            MATCH (v:Visit)
+            RETURN min(v.date) AS earliest, max(v.date) AS latest
+        """).single()
 
-    days_back = ask("How many days back to analyze?", default="90")
-    try:
-        days_back = int(days_back)
-    except ValueError:
-        days_back = 90
+    if not result or not result["earliest"]:
+        warn("No data in graph yet. Ingest some reports first.")
+        return
 
-    info(f"Running analysis: {days_back} days back from {anchor_date}...")
+    earliest = result["earliest"]
+    latest   = result["latest"]
+
+    # If called after a specific ingestion, use that date as anchor
+    # Otherwise use the latest date in the graph
+    anchor_date = anchor_date or latest
+
+    from datetime import datetime
+    delta = (datetime.strptime(latest, "%Y-%m-%d") -
+             datetime.strptime(earliest, "%Y-%m-%d")).days + 1
+    days_back = max(delta, 1)
+
+    info(f"Analysing full data span: {earliest} → {latest} ({days_back} days)")
     from analysis import run_analysis_pass
     run_analysis_pass(anchor_date, days_back)
 
 
-def flow_sample_data():
-    section("Ingest All Sample Data")
-    print("\n  This will load the 3 sample files into your graph:")
-    print("    • sample_data/report_2025_01_15.txt  (medical report)")
-    print("    • sample_data/chest_xray_2025_01_15.txt  (X-Ray)")
-    print("    • sample_data/wearable_2025_01_15.json  (Apple Watch)")
 
-    if not confirm("Proceed?"):
-        return
-
-    date = "2025-01-15"
-
-    from ingest import ingest_medical_report, ingest_scan_report, ingest_wearable_data
-
-    info("Ingesting medical report...")
-    ingest_medical_report("sample_data/report_2025_01_15.txt", date)
-
-    info("Ingesting chest X-ray...")
-    ingest_scan_report("sample_data/chest_xray_2025_01_15.txt", date, "Chest X-Ray", "chest")
-
-    info("Ingesting wearable data...")
-    ingest_wearable_data("sample_data/wearable_2025_01_15.json", date)
-
-    info("Running analysis pass...")
-    from analysis import run_analysis_pass
-    run_analysis_pass(date, 90)
-
-    section("Done! View your graph in Neo4j Browser")
-    print("""
-  1. Open Neo4j Desktop → click Open → Neo4j Browser
-  2. Paste this to see everything:
-
-     MATCH (n)-[r]->(m) RETURN n, r, m LIMIT 100
-
-  3. To see only AI-inferred relationships:
-
-     MATCH (a)-[r]->(b) WHERE r.inferred_by = 'llm' RETURN a, r, b
-    """)
 
 
 # ─────────────────────────────────────────────
@@ -462,7 +425,6 @@ def main():
 
     # Step 4: main loop
     while True:
-        header()
         choice = main_menu()
 
         if "medical report" in choice:
@@ -471,10 +433,6 @@ def main():
             flow_scan()
         elif "wearable" in choice:
             flow_wearable()
-        elif "analysis" in choice:
-            flow_analysis()
-        elif "sample data" in choice:
-            flow_sample_data()
         elif "Exit" in choice:
             print("\n  Goodbye!\n")
             graph_db.close()
