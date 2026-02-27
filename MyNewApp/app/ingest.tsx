@@ -6,31 +6,113 @@ import {
   TouchableOpacity,
   Alert,
   SafeAreaView,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// Only import native upload on non-web platforms
+let uploadAsync: any = null;
+let FileSystemUploadType: any = null;
+if (Platform.OS !== "web") {
+  const legacy = require("expo-file-system/legacy");
+  uploadAsync = legacy.uploadAsync;
+  FileSystemUploadType = legacy.FileSystemUploadType;
+}
+
+const API_URL =
+  Platform.OS === "web"
+    ? "http://192.168.1.100:9000"
+    : "http://192.168.1.100:9000";
+
 export default function Ingest() {
-  const pickFile = async () => {
+  const [selectedFile, setSelectedFile] = React.useState<any>(null);
+  const [uploading, setUploading] = React.useState(false);
+
+  const selectFile = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({});
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/pdf", "image/*"],
+        copyToCacheDirectory: true,
+      });
 
       if (!result.canceled && result.assets) {
-        const name = result.assets[0].name;
-
-        const old = await AsyncStorage.getItem("records");
-        const arr = old ? JSON.parse(old) : [];
-
-        arr.push(name);
-
-        await AsyncStorage.setItem("records", JSON.stringify(arr));
-
-        Alert.alert("Success", "File saved successfully ✅");
+        setSelectedFile(result.assets[0]);
       }
     } catch (error) {
-      Alert.alert("Error", "Something went wrong");
+      Alert.alert("Error", "Failed to select file");
+    }
+  };
+
+  const uploadFile = async () => {
+    if (!selectedFile) {
+      Alert.alert("No File", "Please select a file first");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      let status: number;
+      let body: string;
+
+      if (Platform.OS === "web") {
+        // Web: use fetch + FormData (works in browsers)
+        const formData = new FormData();
+        if (selectedFile.file) {
+          // expo-document-picker on web gives us the actual File object
+          formData.append("file", selectedFile.file);
+        } else {
+          // Fallback: create a blob from URI
+          const resp = await fetch(selectedFile.uri);
+          const blob = await resp.blob();
+          formData.append("file", blob, selectedFile.name);
+        }
+
+        const response = await fetch(`${API_URL}/upload`, {
+          method: "POST",
+          body: formData,
+        });
+        body = await response.text();
+        status = response.status;
+      } else {
+        // Native: use expo-file-system uploadAsync
+        const uploadResult = await uploadAsync(
+          `${API_URL}/upload`,
+          selectedFile.uri,
+          {
+            fieldName: "file",
+            httpMethod: "POST",
+            uploadType: FileSystemUploadType.MULTIPART,
+            mimeType: selectedFile.mimeType || "application/pdf",
+          }
+        );
+        status = uploadResult.status;
+        body = uploadResult.body;
+      }
+
+      console.log("Upload response:", status, body);
+
+      if (status !== 200) {
+        const err = JSON.parse(body || "{}");
+        Alert.alert("Upload Failed", err.detail || "Server rejected the file");
+        return;
+      }
+
+      // Save filename locally for record display
+      const old = await AsyncStorage.getItem("records");
+      const arr = old ? JSON.parse(old) : [];
+      arr.push(selectedFile.name);
+      await AsyncStorage.setItem("records", JSON.stringify(arr));
+
+      Alert.alert("Success", "File uploaded to backend ✅");
+      setSelectedFile(null);
+    } catch (error) {
+      console.log("Upload exception:", error);
+      Alert.alert("Error", "Failed to upload file");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -54,15 +136,37 @@ export default function Ingest() {
               color="#00c6ff"
             />
 
-            <Text style={styles.cardTitle}>Upload PDF</Text>
+            <Text style={styles.cardTitle}>Upload PDF / Image</Text>
             <Text style={styles.cardDesc}>
               Select your medical document
             </Text>
 
-            <TouchableOpacity style={styles.uploadBtn} onPress={pickFile}>
-              <Ionicons name="add-circle-outline" size={20} color="white" />
-              <Text style={styles.uploadText}> Select File</Text>
+            {/* Select File Button */}
+            <TouchableOpacity style={styles.selectBtn} onPress={selectFile}>
+              <Ionicons name="document-outline" size={20} color="white" />
+              <Text style={styles.btnText}>
+                {selectedFile ? "  Change File" : "  Select File"}
+              </Text>
             </TouchableOpacity>
+
+            {/* Show selected file name */}
+            {selectedFile && (
+              <Text style={styles.fileName}>📄 {selectedFile.name}</Text>
+            )}
+
+            {/* Upload Button */}
+            {selectedFile && (
+              <TouchableOpacity
+                style={[styles.uploadBtn, uploading && { opacity: 0.6 }]}
+                onPress={uploadFile}
+                disabled={uploading}
+              >
+                <Ionicons name="cloud-upload" size={20} color="white" />
+                <Text style={styles.btnText}>
+                  {uploading ? "  Uploading..." : "  Upload"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </SafeAreaView>
@@ -83,7 +187,7 @@ const styles = StyleSheet.create({
 
   title: {
     fontSize: 22,
-    fontWeight: "700",
+    fontWeight: "700" as const,
     color: "white",
     marginBottom: 8,
   },
@@ -97,7 +201,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.08)",
     padding: 25,
     borderRadius: 20,
-    alignItems: "center",
+    alignItems: "center" as const,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.2)",
   },
@@ -105,7 +209,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     color: "white",
-    fontWeight: "600",
+    fontWeight: "600" as const,
     marginTop: 15,
   },
 
@@ -114,17 +218,37 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  uploadBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#00c6ff",
+  selectBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: "rgba(255,255,255,0.15)",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
   },
 
-  uploadText: {
+  fileName: {
+    color: "#00c6ff",
+    marginTop: 14,
+    marginBottom: 4,
+    fontSize: 13,
+  },
+
+  uploadBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    backgroundColor: "#00c6ff",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 14,
+  },
+
+  btnText: {
     color: "white",
-    fontWeight: "600",
+    fontWeight: "600" as const,
   },
 });
+

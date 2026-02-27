@@ -8,6 +8,10 @@
     "scheme": "mynewapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "updates": {
+      "enabled": false,
+      "url": "https://u.expo.dev/51854ec2-cf73-461f-807a-6ba4464689bb"
+    },
     "ios": {
       "supportsTablet": true
     },
@@ -44,6 +48,16 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "51854ec2-cf73-461f-807a-6ba4464689bb"
+      }
+    },
+    "owner": "agiless",
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

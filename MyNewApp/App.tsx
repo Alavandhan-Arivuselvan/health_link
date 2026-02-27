@@ -7,7 +7,7 @@ import { theme } from './src/theme';
 const App = () => {
     return (
         <>
-            <StatusBar backgroundColor={theme.colors.primary} barStyle="light-content" />
+            <StatusBar backgroundColor={theme.colors.bgDark} barStyle="light-content" />
             <RootNavigator />
         </>
     );

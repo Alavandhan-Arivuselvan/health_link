@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme';
 
 interface Props {
@@ -22,57 +23,90 @@ const CustomButton: React.FC<Props> = ({
     textStyle,
     type = 'primary'
 }) => {
-    const getBackgroundColor = () => {
-        if (disabled) return theme.colors.gray;
-        if (type === 'outline') return 'transparent';
-        return theme.colors.secondary;
-    };
-
-    const getTextColor = () => {
-        if (type === 'outline') return theme.colors.secondary;
-        return theme.colors.white;
-    };
+    if (type === 'primary') {
+        return (
+            <TouchableOpacity
+                onPress={onPress}
+                disabled={disabled || loading}
+                activeOpacity={0.8}
+                style={[styles.wrapper, style]}
+            >
+                <LinearGradient
+                    colors={disabled ? ['#3A4A5A', '#3A4A5A'] : ['#00D4AA', '#00B894']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.gradient}
+                >
+                    {loading ? (
+                        <ActivityIndicator color={theme.colors.white} />
+                    ) : (
+                        <Text style={[styles.text, textStyle]}>{title}</Text>
+                    )}
+                </LinearGradient>
+            </TouchableOpacity>
+        );
+    }
 
     return (
         <TouchableOpacity
             style={[
                 styles.container,
-                { backgroundColor: getBackgroundColor(), borderColor: theme.colors.secondary },
                 type === 'outline' && styles.outline,
+                disabled && styles.disabled,
                 style
             ]}
             onPress={onPress}
             disabled={disabled || loading}
+            activeOpacity={0.7}
         >
             {loading ? (
-                <ActivityIndicator color={theme.colors.white} />
+                <ActivityIndicator color={theme.colors.accent} />
             ) : (
-                <Text style={[styles.text, { color: getTextColor() }, textStyle]}>{title}</Text>
+                <Text style={[
+                    styles.text,
+                    type === 'outline' && styles.outlineText,
+                    textStyle
+                ]}>{title}</Text>
             )}
         </TouchableOpacity>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        height: 50,
-        borderRadius: theme.borderRadius.l,
+    wrapper: {
+        marginVertical: theme.spacing.s,
+        borderRadius: theme.borderRadius.m,
+        overflow: 'hidden',
+        ...theme.shadow.card,
+    },
+    gradient: {
+        height: 52,
+        borderRadius: theme.borderRadius.m,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingHorizontal: theme.spacing.m,
+        paddingHorizontal: theme.spacing.l,
+    },
+    container: {
+        height: 52,
+        borderRadius: theme.borderRadius.m,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: theme.spacing.l,
         marginVertical: theme.spacing.s,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
     },
     outline: {
-        borderWidth: 2,
+        borderWidth: 1.5,
+        borderColor: theme.colors.border,
+        backgroundColor: 'transparent',
+    },
+    disabled: {
+        opacity: 0.5,
     },
     text: {
-        fontSize: theme.typography.button.fontSize,
-        fontWeight: 'bold',
+        ...theme.typography.button,
+    },
+    outlineText: {
+        color: theme.colors.accent,
     },
 });
 
