@@ -316,6 +316,7 @@ def insert_wearable_metric(date: str, metric_name: str, canonical_id: str,
     metric_id = f"{canonical_id}_{timestamp or date}"
 
     with driver.session() as session:
+        # Create MetricType, Metric, and link to WearableLog container
         session.run("""
             MERGE (mt:MetricType {canonical_id: $canonical_id})
             SET mt.display_name = $metric_name, mt.unit = $unit
@@ -334,15 +335,24 @@ def insert_wearable_metric(date: str, metric_name: str, canonical_id: str,
             WITH m
             MATCH (w:WearableLog {date: $date})
             MERGE (w)-[:CONTAINS]->(m)
-
-            WITH m
-            MATCH (prev:Metric {metric_id: $canonical_id + '_' + ''})
-            WHERE prev.date < $date AND prev.metric_id = $canonical_id
-            WITH m, prev ORDER BY prev.date DESC LIMIT 1
-            MERGE (m)-[:TREND_OF]->(prev)
         """, metric_id=metric_id, date=date, timestamp=timestamp, value=value,
              unit=unit, canonical_id=canonical_id, metric_name=metric_name,
              aggregation=aggregation)
+
+        # Link to the most recent previous Metric for the same canonical metric type.
+        # Must be a separate query — MERGE + subsequent MATCH/ORDER BY LIMIT 1
+        # cannot be combined reliably in a single Cypher statement.
+        session.run("""
+            MATCH (current:Metric {metric_id: $metric_id})
+            MATCH (prev:Metric)
+            WHERE prev.metric_id = $canonical_id
+              AND prev.date < $date
+              AND prev.metric_id = $canonical_id
+              AND prev.aggregation = $aggregation
+            WITH current, prev ORDER BY prev.date DESC LIMIT 1
+            MERGE (current)-[:TREND_OF]->(prev)
+        """, metric_id=metric_id, date=date,
+             canonical_id=canonical_id, aggregation=aggregation)
 
 
 def batch_insert_wearable_metrics(date: str, metrics: list, device: str = "unknown"):
