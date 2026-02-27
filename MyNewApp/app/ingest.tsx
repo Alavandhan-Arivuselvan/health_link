@@ -24,8 +24,8 @@ if (Platform.OS !== "web") {
 
 const API_URL =
   Platform.OS === "web"
-    ? "http://localhost:9000"
-    : "http://10.67.77.22:9000";
+    ? "http://192.168.1.100:9000"
+    : "http://192.168.1.100:9000";
 
 export default function Ingest() {
   const [selectedFile, setSelectedFile] = React.useState<any>(null);

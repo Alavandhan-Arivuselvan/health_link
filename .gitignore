@@ -21,3 +21,5 @@ backend/run_backend.bat
 KG/reports/.env
 KG/Graph_Schema/.env
 KG/Graph_Schema/__pycache__/
+ML/fitbit_2weeks_data.json
+ML/toke.txt
