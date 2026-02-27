@@ -1,6 +1,10 @@
 from backend import app
 import uvicorn
 
+@app.get("/")
+def read_root():
+    return {"Hello": "World"}
+
 if __name__ == "__main__":
     port = 9000
     print(f"\n🚀 Starting HealthLink Backend on port {port}")

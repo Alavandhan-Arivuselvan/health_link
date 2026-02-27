@@ -3,12 +3,12 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "scripts": {
-    "start": "node scripts/update-host.js && expo start --tunnel",
+    "start": "expo start --tunnel",
     "reset-project": "node ./scripts/reset-project.js",
-    "android": "node scripts/update-host.js && expo start --tunnel --android",
-    "ios": "node scripts/update-host.js && expo start --tunnel --ios",
-    "web": "node scripts/update-host.js && expo start --web",
-    "start:lan": "node scripts/update-host.js && expo start",
+    "android": "expo start --tunnel --android",
+    "ios": "expo start --tunnel --ios",
+    "web": "expo start --web",
+    "start:lan": "expo start",
     "lint": "expo lint"
   },
   "dependencies": {

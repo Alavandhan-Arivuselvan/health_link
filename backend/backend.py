@@ -2,8 +2,10 @@ from fastapi import FastAPI, Body, UploadFile, File, Form, HTTPException, Backgr
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 import random
+import datetime as dt
+import uuid
 import os
 import shutil
 from utils import process_medical_file, start_interactive_chat
@@ -195,18 +197,85 @@ def verify_otp(request: OTPVerify):
         return {"status": "success", "message": "OTP verified"}
     return {"status": "error", "message": "Invalid OTP"}
 
+def _background_process_and_update(report_id: str, user_phone: str, file_path: str):
+    """Background task: runs OCR/AI processing, then updates the Supabase report row."""
+    try:
+        result = process_medical_file(user_phone, file_path)
+        if result and result.get("status") == "success":
+            extracted = result.get("data", {})
+            clinical = extracted.get("clinical_data", {}) or {}
+            lab_count = len(clinical.get("lab_reports", []) or [])
+            vitals_count = len(clinical.get("vitals", []) or [])
+            meds_count = len(clinical.get("medications", []) or [])
+            diag_count = len(clinical.get("diagnosis", []) or [])
+            metrics_count = lab_count + vitals_count
+            metrics_list = [l.get("name", "") for l in (clinical.get("lab_reports", []) or [])]
+            metrics_list += [v.get("name", "") for v in (clinical.get("vitals", []) or [])]
+            patient_info = extracted.get("patient_info", {}) or {}
+            supabase.table("reports").update({
+                "status": "processed",
+                "metrics_count": metrics_count,
+                "metrics_list": metrics_list,
+                "extracted_data": extracted,
+                "patient_name": patient_info.get("name"),
+            }).eq("id", report_id).execute()
+            print(f"✅ Report {report_id} updated: {metrics_count} metrics extracted.")
+        else:
+            supabase.table("reports").update({
+                "status": "failed",
+            }).eq("id", report_id).execute()
+            print(f"❌ Report {report_id} processing failed.")
+    except Exception as e:
+        print(f"❌ Background processing error for report {report_id}: {e}")
+        try:
+            supabase.table("reports").update({"status": "failed"}).eq("id", report_id).execute()
+        except:
+            pass
+
+
 @app.post("/upload")
-async def upload_file(file: UploadFile = File(...), user_phone: str = Form(""), background_tasks: BackgroundTasks = None):
+async def upload_file(
+    file: UploadFile = File(...),
+    user_phone: str = Form(""),
+    background_tasks: BackgroundTasks = None,
+):
     if not (file.content_type.startswith("image/") or file.content_type == "application/pdf"):
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDF and Images are allowed.")
-    
+
+    # Save file locally
     file_path = os.path.join(UPLOAD_DIR, file.filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    
-    # Process in background so the response returns immediately
-    background_tasks.add_task(process_medical_file, user_phone, file_path)
-    return {"status": "processing", "filename": file.filename, "path": file_path, "message": "File uploaded. Processing in background."}
+
+    # Create a report record in Supabase with status 'processing'
+    report_id = str(uuid.uuid4())
+    now_iso = dt.datetime.now(dt.timezone.utc).isoformat()
+    file_type = "pdf" if file.content_type == "application/pdf" else "image"
+
+    report_row = {
+        "id": report_id,
+        "user_phone": user_phone,
+        "filename": file.filename,
+        "file_type": file_type,
+        "status": "processing",
+        "metrics_count": 0,
+        "metrics_list": [],
+        "uploaded_at": now_iso,
+    }
+
+    if supabase:
+        supabase.table("reports").insert(report_row).execute()
+        print(f"📋 Report record created: {report_id}")
+
+    # Process in background — will update the report row when done
+    background_tasks.add_task(_background_process_and_update, report_id, user_phone, file_path)
+
+    return {
+        "status": "processing",
+        "report_id": report_id,
+        "filename": file.filename,
+        "message": "File uploaded. Processing in background.",
+    }
 
 health_records = {
     "past": [
@@ -325,3 +394,33 @@ def get_qr(payload: dict = Body(...)):
 @app.get("/profile/{phone}")
 def get_profile(phone: str):
     return {"message": f"Health profile for {phone}", "phone": phone}
+
+
+# ──────────────────────────────────────────────────────────
+# REPORTS ENDPOINTS (Supabase)
+# ──────────────────────────────────────────────────────────
+
+@app.get("/reports/{user_phone}")
+def list_reports(user_phone: str):
+    """Return all reports for a user, newest first."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    result = (
+        supabase.table("reports")
+        .select("id, filename, file_type, status, metrics_count, metrics_list, uploaded_at, patient_name")
+        .eq("user_phone", user_phone)
+        .order("uploaded_at", desc=True)
+        .execute()
+    )
+    return {"status": "success", "reports": result.data}
+
+
+@app.get("/reports/detail/{report_id}")
+def get_report_detail(report_id: str):
+    """Return full report including extracted data."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    result = supabase.table("reports").select("*").eq("id", report_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Report not found")
+    return {"status": "success", "report": result.data[0]}

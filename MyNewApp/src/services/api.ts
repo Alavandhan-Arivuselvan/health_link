@@ -77,10 +77,26 @@ export const statsAPI = {
     saveStats: (stats: any) => fetchClient('/save-stats', { method: 'POST', body: JSON.stringify(stats) }),
 };
 
+export const reportsAPI = {
+    /** Upload a file and create a report record in Supabase. */
+    upload: (formData: FormData) => fetchClient('/upload', {
+        method: 'POST',
+        body: formData,
+        isFormData: true,
+    } as any),
+
+    /** List all reports for a given user (newest first). */
+    list: (userPhone: string) => fetchClient(`/reports/${encodeURIComponent(userPhone)}`, { method: 'GET' }),
+
+    /** Get full details (including extracted data) for a single report. */
+    detail: (reportId: string) => fetchClient(`/reports/detail/${encodeURIComponent(reportId)}`, { method: 'GET' }),
+};
+
 // Default export if needed, though we should prefer named exports
 export default {
     ...authAPI,
     ...doctorAPI,
     ...chatAPI,
-    ...statsAPI
+    ...statsAPI,
+    ...reportsAPI,
 };
