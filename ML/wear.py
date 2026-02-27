@@ -146,7 +146,7 @@ def calculate_sleep_streaks_and_nudges(full_data):
         nudge = "Several late nights recently — earlier bedtime + aiming for 7+ hours could make a big difference."
     else:
         nudge = f"Your average bedtime is ~{avg_bedtime_str} with ~{avg_sleep_hours:.1f} hours sleep — fairly stable. Keep pushing for 7+ hours consistently."
-
+   
     return {
         "current_streak": current_streak,
         "max_streak": max_streak,

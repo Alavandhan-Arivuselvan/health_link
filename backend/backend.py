@@ -8,6 +8,7 @@ import datetime as dt
 import uuid
 import os
 import shutil
+import json
 from utils import process_medical_file, start_interactive_chat
 from twilio.rest import Client
 from supabase import create_client, Client as SupabaseClient
@@ -424,3 +425,81 @@ def get_report_detail(report_id: str):
     if not result.data:
         raise HTTPException(status_code=404, detail="Report not found")
     return {"status": "success", "report": result.data[0]}
+
+
+# ──────────────────────────────────────────────────────────
+# FITBIT INSIGHTS ENDPOINTS (uses ML/wear.py functions)
+# ──────────────────────────────────────────────────────────
+import sys
+import subprocess
+
+# Add ML directory to path so we can import wear.py functions
+ML_DIR = os.path.join(os.path.dirname(basedir), "ML")
+sys.path.insert(0, ML_DIR)
+from wear import forecast_body_battery, calculate_sleep_streaks_and_nudges, generate_personalized_nudges
+
+FITBIT_JSON_PATH = os.path.join(ML_DIR, "fitbit_2weeks_data.json")
+
+
+@app.get("/api/fitbit-insights")
+def get_fitbit_insights():
+    """
+    Read the Fitbit JSON data file and compute all 3 wellness insights:
+      1. Body Battery Energy Forecast
+      2. Sleep Consistency Streaks & Nudges
+      3. Personalized Nudges
+    """
+    if not os.path.exists(FITBIT_JSON_PATH):
+        raise HTTPException(status_code=404, detail="Fitbit data not found. Run data fetch first.")
+
+    try:
+        with open(FITBIT_JSON_PATH, "r", encoding="utf-8") as f:
+            full_data = json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read Fitbit data: {str(e)}")
+
+    # Run all 3 insight functions from wear.py
+    energy_forecast = forecast_body_battery(full_data)
+    sleep_consistency = calculate_sleep_streaks_and_nudges(full_data)
+    nudges = generate_personalized_nudges(full_data)
+
+    # Get file modification time as "last sync"
+    mod_time = os.path.getmtime(FITBIT_JSON_PATH)
+    last_sync = dt.datetime.fromtimestamp(mod_time).isoformat()
+    print(energy_forecast)
+    print(sleep_consistency)
+    print(nudges)
+    return {
+        "status": "success",
+        "last_sync": last_sync,
+        "energy_forecast": energy_forecast,
+        "sleep_consistency": sleep_consistency,
+        "nudges": nudges,
+    }
+
+
+@app.post("/api/fitbit-refresh")
+def refresh_fitbit_data():
+    """
+    Re-run final_fetch.py to pull fresh data from Fitbit API
+    and overwrite fitbit_2weeks_data.json.
+    """
+    fetch_script = os.path.join(ML_DIR, "final_fetch.py")
+    if not os.path.exists(fetch_script):
+        raise HTTPException(status_code=404, detail="Fetch script not found")
+
+    try:
+        result = subprocess.run(
+            [sys.executable, fetch_script],
+            cwd=ML_DIR,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=f"Fetch failed: {result.stderr}")
+        return {"status": "success", "message": "Fitbit data refreshed"}
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Fetch timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fetch error: {str(e)}")
