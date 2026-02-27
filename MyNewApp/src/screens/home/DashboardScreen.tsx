@@ -103,7 +103,10 @@ const DashboardScreen = ({ navigation }: any) => {
 
             {/* ── HEADER ─────────────────────────────────── */}
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>HealthLink</Text>
+                <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+                    <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+                <Text style={styles.headerTitle}>Dashboard</Text>
                 <View style={styles.headerRight}>
                     <TouchableOpacity style={styles.headerIconBtn}>
                         <Ionicons name="notifications-outline" size={22} color={theme.colors.text} />
@@ -251,7 +254,12 @@ const styles = StyleSheet.create({
         paddingTop: 54, paddingHorizontal: 20, paddingBottom: 14,
         borderBottomWidth: 1, borderBottomColor: theme.colors.border,
     },
-    headerTitle: { fontSize: 26, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.5 } as any,
+    backBtn: {
+        width: 40, height: 40, borderRadius: 20,
+        backgroundColor: theme.colors.glassLight, justifyContent: 'center', alignItems: 'center',
+        borderWidth: 1, borderColor: theme.colors.border,
+    },
+    headerTitle: { fontSize: 20, fontWeight: '700', color: theme.colors.text } as any,
     headerRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
     headerIconBtn: {
         width: 44, height: 44, borderRadius: 22,

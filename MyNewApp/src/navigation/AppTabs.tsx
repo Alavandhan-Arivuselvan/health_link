@@ -14,7 +14,7 @@ const Tab = createBottomTabNavigator();
 
 const getTabIcon = (routeName: string): keyof typeof Ionicons.glyphMap => {
     switch (routeName) {
-        case 'Dashboard': return 'home';
+        case 'Home': return 'home';
         case 'Chat': return 'chatbubble';
         case 'Web': return 'stats-chart';
         case 'Upload': return 'cloud-upload';
@@ -52,7 +52,7 @@ const AppTabs = () => {
                 ),
             })}
         >
-            <Tab.Screen name="Dashboard" component={DashboardStack} options={{ tabBarLabel: 'Dashboard' }} />
+            <Tab.Screen name="Home" component={DashboardStack} options={{ tabBarLabel: 'Home' }} />
             <Tab.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: 'Chat' }} />
             <Tab.Screen name="Web" component={WebScreen} options={{ tabBarLabel: 'Visualize' }} />
             <Tab.Screen name="Upload" component={IngestScreen} options={{ tabBarLabel: 'Upload' }} />
