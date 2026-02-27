@@ -23,3 +23,5 @@ KG/Graph_Schema/.env
 KG/Graph_Schema/__pycache__/
 ML/fitbit_2weeks_data.json
 ML/toke.txt
+KG/GraphRag/.env
+KG/GraphRag/__pycache__/
