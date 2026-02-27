@@ -18,3 +18,6 @@ backend/__pycache__/
 Frontend/__pycache__/
 backend/demo.html
 backend/run_backend.bat
+KG/reports/.env
+KG/Graph_Schema/.env
+KG/Graph_Schema/__pycache__/
