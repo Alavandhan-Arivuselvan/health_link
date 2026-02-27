@@ -45,14 +45,27 @@ const COLORS = {
 
 // ─── Types matching backend response ────────────────────────────
 
+interface FactorDetail {
+  value: number;
+  unit: string;
+  score: number;
+}
+
 interface EnergyForecast {
   date: string;
   forecast: string;
   nudge: string;
   energy_level: 'low' | 'high' | 'average';
-  sleep_efficiency_used: number;
-  active_minutes_proxy: number;
-  resting_bpm: number;
+  energy_score: number;
+  factors: {
+    sleep_efficiency: FactorDetail;
+    sleep_duration: FactorDetail;
+    deep_sleep: FactorDetail;
+    steps: FactorDetail;
+    resting_hr: FactorDetail;
+    active_zone_min: FactorDetail;
+    calories: FactorDetail;
+  };
 }
 
 interface SleepConsistency {
@@ -64,12 +77,25 @@ interface SleepConsistency {
   nudge: string;
 }
 
+interface StepConsistency {
+  average_steps: number;
+  total_days: number;
+  current_streak: number;
+  best_streak: number;
+  best_day: { date: string; steps: number };
+  worst_day: { date: string; steps: number };
+  days_at_goal: number;
+  goal: number;
+  nudges: string[];
+}
+
 interface InsightsResponse {
   status: string;
   last_sync: string;
   energy_forecast: EnergyForecast;
   sleep_consistency: SleepConsistency;
   nudges: string[];
+  step_consistency: StepConsistency;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -136,6 +162,7 @@ const StatsScreen = () => {
   const [energyForecast, setEnergyForecast] = useState<EnergyForecast | null>(null);
   const [sleepConsistency, setSleepConsistency] = useState<SleepConsistency | null>(null);
   const [nudges, setNudges] = useState<string[]>([]);
+  const [stepConsistency, setStepConsistency] = useState<StepConsistency | null>(null);
 
   // ── Fetch insights from backend ───────────────────────────────
   const fetchInsights = useCallback(async () => {
@@ -157,6 +184,7 @@ const StatsScreen = () => {
       setEnergyForecast(data.energy_forecast);
       setSleepConsistency(data.sleep_consistency);
       setNudges(data.nudges);
+      setStepConsistency(data.step_consistency);
       setLastSync(data.last_sync);
       setHasData(true);
     } catch (e: any) {
@@ -358,26 +386,26 @@ const StatsScreen = () => {
               { backgroundColor: energyBg(energyForecast.energy_level) },
             ]}>
               <Text style={[styles.forecastLabel, { color: energyColor(energyForecast.energy_level) }]}>
-                {energyForecast.forecast}
+                {energyForecast.forecast}  •  {energyForecast.energy_score}/100
               </Text>
             </View>
             <Text style={styles.forecastNudge}>{energyForecast.nudge}</Text>
 
             <View style={styles.statPillRow}>
               <StatPill
-                label="Sleep Eff."
-                value={`${energyForecast.sleep_efficiency_used}%`}
-                color={COLORS.purple}
-              />
-              <StatPill
-                label="Active Min"
-                value={`${energyForecast.active_minutes_proxy}`}
+                label="Steps"
+                value={energyForecast.factors.steps.value.toLocaleString()}
                 color={COLORS.teal}
               />
               <StatPill
                 label="RHR"
-                value={`${energyForecast.resting_bpm} bpm`}
+                value={`${energyForecast.factors.resting_hr.value} bpm`}
                 color={COLORS.red}
+              />
+              <StatPill
+                label="Active Min"
+                value={`${energyForecast.factors.active_zone_min.value}`}
+                color={COLORS.teal}
               />
             </View>
           </InsightCard>
@@ -433,6 +461,67 @@ const StatsScreen = () => {
           </InsightCard>
         )}
 
+        {/* ── Card 3: Step Consistency ── */}
+        {stepConsistency && (
+          <InsightCard
+            icon="footsteps"
+            iconFamily="ionicons"
+            iconColor={COLORS.teal}
+            iconBg={COLORS.tealLight}
+            title="Step Consistency"
+          >
+            {/* Goal badge */}
+            <View style={[styles.forecastBadge, { backgroundColor: COLORS.tealLight, marginBottom: 14 }]}>
+              <Text style={[styles.forecastLabel, { color: COLORS.teal }]}>
+                🎯 Goal: {stepConsistency.goal.toLocaleString()} steps
+              </Text>
+            </View>
+
+            {/* Step stats row */}
+            <View style={styles.streakRow}>
+              <View style={styles.streakItem}>
+                <Text style={styles.streakNumber}>{stepConsistency.average_steps.toLocaleString()}</Text>
+                <Text style={styles.streakLabel}>Avg Steps</Text>
+              </View>
+              <View style={styles.streakDivider} />
+              <View style={styles.streakItem}>
+                <Text style={styles.streakNumber}>{stepConsistency.current_streak}</Text>
+                <Text style={styles.streakLabel}>Streak</Text>
+              </View>
+              <View style={styles.streakDivider} />
+              <View style={styles.streakItem}>
+                <Text style={styles.streakNumber}>{stepConsistency.best_streak}</Text>
+                <Text style={styles.streakLabel}>Best</Text>
+              </View>
+              <View style={styles.streakDivider} />
+              <View style={styles.streakItem}>
+                <Text style={styles.streakNumber}>{stepConsistency.days_at_goal}/{stepConsistency.total_days}</Text>
+                <Text style={styles.streakLabel}>Goal Days</Text>
+              </View>
+            </View>
+
+            {/* Best / Worst day pills */}
+            <View style={styles.statPillRow}>
+              <StatPill
+                label={`Best (${stepConsistency.best_day.date.slice(5)})`}
+                value={stepConsistency.best_day.steps.toLocaleString()}
+                color={COLORS.green}
+              />
+              <StatPill
+                label={`Low (${stepConsistency.worst_day.date.slice(5)})`}
+                value={stepConsistency.worst_day.steps.toLocaleString()}
+                color={COLORS.red}
+              />
+            </View>
+
+            {/* Step nudges */}
+            {stepConsistency.nudges.map((nudge, i) => (
+              <View key={i} style={[styles.nudgeRow, { marginTop: i === 0 ? 12 : 0 }]}>
+                <Text style={styles.nudgeText}>{nudge}</Text>
+              </View>
+            ))}
+          </InsightCard>
+        )}
 
         {/* Bottom spacer */}
         <View style={{ height: 40 }} />

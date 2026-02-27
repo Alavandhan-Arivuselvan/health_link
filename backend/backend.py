@@ -10,6 +10,12 @@ import os
 import shutil
 import json
 from utils import process_medical_file, start_interactive_chat
+
+# Add ontology directory to path so we can import ontology.py
+ONTOLOGY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ontology")
+import sys as _sys
+_sys.path.insert(0, ONTOLOGY_DIR)
+from ontology import process_medical_report
 from twilio.rest import Client
 from supabase import create_client, Client as SupabaseClient
 import bcrypt
@@ -198,33 +204,89 @@ def verify_otp(request: OTPVerify):
         return {"status": "success", "message": "OTP verified"}
     return {"status": "error", "message": "Invalid OTP"}
 
+def _ocr_extract_text(file_path: str) -> str:
+    """Run OCR on a PDF or image and return the raw text."""
+    import tempfile
+    ext = os.path.splitext(file_path)[1].lower()
+    text = ""
+    if ext == ".pdf":
+        try:
+            from pdf2image import convert_from_path
+            import pytesseract
+            POPPLER_PATH = os.environ.get("POPPLER_PATH", r"C:\poppler\poppler-24.08.0\Library\bin")
+            images = convert_from_path(file_path, dpi=500, poppler_path=POPPLER_PATH)
+            for i, img in enumerate(images):
+                page_text = pytesseract.image_to_string(img, config=r'--psm 6')
+                text += f"\n--- Page {i+1} ---\n{page_text}"
+        except Exception as e:
+            print(f"❌ OCR Error: {e}")
+    elif ext in [".jpg", ".jpeg", ".png"]:
+        try:
+            import pytesseract
+            from PIL import Image
+            img = Image.open(file_path)
+            text = pytesseract.image_to_string(img, config=r'--psm 6')
+        except Exception as e:
+            print(f"❌ Image OCR Error: {e}")
+    return text
+
+
 def _background_process_and_update(report_id: str, user_phone: str, file_path: str):
-    """Background task: runs OCR/AI processing, then updates the Supabase report row."""
+    """Background task: runs OCR + ontology processing, then updates the Supabase report row."""
     try:
+        # Step 1: Run existing LLM pipeline (for MongoDB/Graph/RAG)
         result = process_medical_file(user_phone, file_path)
-        if result and result.get("status") == "success":
+
+        # Step 2: Run ontology processor on the raw OCR text
+        raw_text = _ocr_extract_text(file_path)
+        ontology_result = None
+        if raw_text.strip():
+            try:
+                ontology_result = process_medical_report(raw_text)
+                print(f"🧬 Ontology: extracted {len(ontology_result.get('lab_results', []))} lab results")
+            except Exception as oe:
+                print(f"⚠️ Ontology processing error: {oe}")
+
+        # Step 3: Build metrics from ontology lab_results
+        metrics_count = 0
+        metrics_list = []
+        patient_name = None
+
+        if ontology_result:
+            lab_results = ontology_result.get("lab_results", []) or []
+            metrics_count = len(lab_results)
+            metrics_list = [r.get("test_name", "") for r in lab_results]
+            patient_info = ontology_result.get("patient", {}) or {}
+            patient_name = patient_info.get("name")
+
+        # Fallback to LLM data if ontology didn't find anything
+        if metrics_count == 0 and result and result.get("status") == "success":
             extracted = result.get("data", {})
             clinical = extracted.get("clinical_data", {}) or {}
             lab_count = len(clinical.get("lab_reports", []) or [])
             vitals_count = len(clinical.get("vitals", []) or [])
-            meds_count = len(clinical.get("medications", []) or [])
-            diag_count = len(clinical.get("diagnosis", []) or [])
             metrics_count = lab_count + vitals_count
             metrics_list = [l.get("name", "") for l in (clinical.get("lab_reports", []) or [])]
             metrics_list += [v.get("name", "") for v in (clinical.get("vitals", []) or [])]
             patient_info = extracted.get("patient_info", {}) or {}
-            supabase.table("reports").update({
+            patient_name = patient_name or patient_info.get("name")
+
+        # Step 4: Update Supabase
+        if ontology_result or (result and result.get("status") == "success"):
+            update_data = {
                 "status": "processed",
                 "metrics_count": metrics_count,
                 "metrics_list": metrics_list,
-                "extracted_data": extracted,
-                "patient_name": patient_info.get("name"),
-            }).eq("id", report_id).execute()
+                "patient_name": patient_name,
+            }
+            if ontology_result:
+                update_data["ontology_data"] = ontology_result
+            if result and result.get("status") == "success":
+                update_data["extracted_data"] = result.get("data", {})
+            supabase.table("reports").update(update_data).eq("id", report_id).execute()
             print(f"✅ Report {report_id} updated: {metrics_count} metrics extracted.")
         else:
-            supabase.table("reports").update({
-                "status": "failed",
-            }).eq("id", report_id).execute()
+            supabase.table("reports").update({"status": "failed"}).eq("id", report_id).execute()
             print(f"❌ Report {report_id} processing failed.")
     except Exception as e:
         print(f"❌ Background processing error for report {report_id}: {e}")
@@ -443,6 +505,90 @@ def get_report_detail(report_id: str):
     return {"status": "success", "report": result.data[0]}
 
 
+@app.get("/api/report/{report_id}/analysis")
+def get_report_analysis(report_id: str):
+    """Return the ontology + LLM extracted data for a report."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    result = supabase.table("reports").select("*").eq("id", report_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Report not found")
+    report = result.data[0]
+    if report["status"] == "processing":
+        return {"status": "processing", "message": "Report is still being processed"}
+    # Debug: print what data exists
+    has_ontology = bool(report.get("ontology_data"))
+    has_extracted = bool(report.get("extracted_data"))
+    ext_keys = list((report.get("extracted_data") or {}).keys())
+    cd_keys = list((report.get("extracted_data") or {}).get("clinical_data", {}).keys()) if has_extracted else []
+    lab_count = len((report.get("extracted_data") or {}).get("clinical_data", {}).get("lab_reports", []) or [])
+    print(f"📊 Analysis debug: ontology={has_ontology}, extracted={has_extracted}, ext_keys={ext_keys}, clinical_keys={cd_keys}, lab_reports={lab_count}")
+    return {
+        "status": "success",
+        "report_id": report_id,
+        "ontology": report.get("ontology_data"),
+        "extracted_data": report.get("extracted_data"),
+        "metrics_count": report.get("metrics_count", 0),
+        "metrics_list": report.get("metrics_list", []),
+        "patient_name": report.get("patient_name"),
+    }
+
+
+@app.get("/api/lab-history/{user_phone}")
+def get_lab_history(user_phone: str):
+    """
+    Aggregate lab results across ALL processed reports for a user.
+    Returns { test_name_lower: [ { date, value, unit }, ... ] } sorted by date ascending.
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Database not configured")
+
+    result = (
+        supabase.table("reports")
+        .select("uploaded_at, ontology_data, extracted_data, status")
+        .eq("user_phone", user_phone)
+        .eq("status", "processed")
+        .order("uploaded_at", desc=False)
+        .execute()
+    )
+
+    history: dict[str, list] = {}
+
+    for report in result.data:
+        report_date = report.get("uploaded_at", "")
+
+        # Try ontology lab results first
+        ontology = report.get("ontology_data") or {}
+        lab_results = ontology.get("lab_results") or []
+
+        # Fallback to extracted_data if ontology has nothing
+        if not lab_results:
+            extracted = report.get("extracted_data") or {}
+            clinical = extracted.get("clinical_data") or {}
+            lab_results = clinical.get("lab_reports") or []
+
+        for lab in lab_results:
+            name = (lab.get("test_name") or lab.get("name") or "").strip()
+            if not name:
+                continue
+            raw_value = lab.get("value") or lab.get("result") or ""
+            try:
+                numeric_value = float(str(raw_value))
+            except (ValueError, TypeError):
+                continue  # skip non-numeric
+
+            key = name.lower()
+            if key not in history:
+                history[key] = []
+            history[key].append({
+                "date": report_date,
+                "value": numeric_value,
+                "unit": lab.get("unit") or "",
+            })
+
+    return {"status": "success", "history": history}
+
+
 # ──────────────────────────────────────────────────────────
 # FITBIT INSIGHTS ENDPOINTS (uses ML/wear.py functions)
 # ──────────────────────────────────────────────────────────
@@ -452,7 +598,7 @@ import subprocess
 # Add ML directory to path so we can import wear.py functions
 ML_DIR = os.path.join(os.path.dirname(basedir), "ML")
 sys.path.insert(0, ML_DIR)
-from wear import forecast_body_battery, calculate_sleep_streaks_and_nudges, generate_personalized_nudges
+from wear import forecast_body_battery, calculate_sleep_streaks_and_nudges, generate_personalized_nudges, calculate_step_consistency
 
 FITBIT_JSON_PATH = os.path.join(ML_DIR, "fitbit_2weeks_data.json")
 
@@ -460,10 +606,11 @@ FITBIT_JSON_PATH = os.path.join(ML_DIR, "fitbit_2weeks_data.json")
 @app.get("/api/fitbit-insights")
 def get_fitbit_insights():
     """
-    Read the Fitbit JSON data file and compute all 3 wellness insights:
+    Read the Fitbit JSON data file and compute all 4 wellness insights:
       1. Body Battery Energy Forecast
       2. Sleep Consistency Streaks & Nudges
       3. Personalized Nudges
+      4. Step Consistency & Nudges
     """
     if not os.path.exists(FITBIT_JSON_PATH):
         raise HTTPException(status_code=404, detail="Fitbit data not found. Run data fetch first.")
@@ -474,10 +621,11 @@ def get_fitbit_insights():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read Fitbit data: {str(e)}")
 
-    # Run all 3 insight functions from wear.py
+    # Run all 4 insight functions from wear.py
     energy_forecast = forecast_body_battery(full_data)
     sleep_consistency = calculate_sleep_streaks_and_nudges(full_data)
     nudges = generate_personalized_nudges(full_data)
+    step_consistency = calculate_step_consistency(full_data)
 
     # Get file modification time as "last sync"
     mod_time = os.path.getmtime(FITBIT_JSON_PATH)
@@ -491,6 +639,7 @@ def get_fitbit_insights():
         "energy_forecast": energy_forecast,
         "sleep_consistency": sleep_consistency,
         "nudges": nudges,
+        "step_consistency": step_consistency,
     }
 
 
