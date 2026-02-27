@@ -234,11 +234,27 @@ def _background_process_and_update(report_id: str, user_phone: str, file_path: s
 
 
 @app.post("/upload")
-async def upload_file(
+async def upload_file(file: UploadFile = File(...), user_phone: str = Form(""), background_tasks: BackgroundTasks = None):
+    """Original upload endpoint — saves locally + OCR/AI in background (no Supabase tracking)."""
+    if not (file.content_type.startswith("image/") or file.content_type == "application/pdf"):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only PDF and Images are allowed.")
+    
+    file_path = os.path.join(UPLOAD_DIR, file.filename)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Process in background so the response returns immediately
+    background_tasks.add_task(process_medical_file, user_phone, file_path)
+    return {"status": "processing", "filename": file.filename, "path": file_path, "message": "File uploaded. Processing in background."}
+
+
+@app.post("/upload-report")
+async def upload_report(
     file: UploadFile = File(...),
     user_phone: str = Form(""),
     background_tasks: BackgroundTasks = None,
 ):
+    """Report upload — saves locally, creates Supabase report row, processes in background."""
     if not (file.content_type.startswith("image/") or file.content_type == "application/pdf"):
         raise HTTPException(status_code=400, detail="Invalid file type. Only PDF and Images are allowed.")
 
@@ -267,14 +283,14 @@ async def upload_file(
         supabase.table("reports").insert(report_row).execute()
         print(f"📋 Report record created: {report_id}")
 
-    # Process in background — will update the report row when done
+    # Process in background — will update the Supabase row when done
     background_tasks.add_task(_background_process_and_update, report_id, user_phone, file_path)
 
     return {
         "status": "processing",
         "report_id": report_id,
         "filename": file.filename,
-        "message": "File uploaded. Processing in background.",
+        "message": "Report uploaded. Processing in background.",
     }
 
 health_records = {

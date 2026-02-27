@@ -79,7 +79,7 @@ export const statsAPI = {
 
 export const reportsAPI = {
     /** Upload a file and create a report record in Supabase. */
-    upload: (formData: FormData) => fetchClient('/upload', {
+    upload: (formData: FormData) => fetchClient('/upload-report', {
         method: 'POST',
         body: formData,
         isFormData: true,
