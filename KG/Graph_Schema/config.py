@@ -1,6 +1,14 @@
 import os
 from dotenv import load_dotenv
 
+# Fix SSL cert verification on machines with incomplete cert stores
+# (common on Windows in corporate/college networks)
+try:
+    import certifi
+    os.environ.setdefault('SSL_CERT_FILE', certifi.where())
+except ImportError:
+    pass
+
 load_dotenv()
 
 # Gemini
