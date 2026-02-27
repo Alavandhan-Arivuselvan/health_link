@@ -433,22 +433,6 @@ const StatsScreen = () => {
           </InsightCard>
         )}
 
-        {/* ── Card 3: Personalized Nudges ── */}
-        {nudges.length > 0 && (
-          <InsightCard
-            icon="zap"
-            iconFamily="feather"
-            iconColor={COLORS.amber}
-            iconBg={COLORS.amberLight}
-            title="Your Nudges"
-          >
-            {nudges.map((nudge, i) => (
-              <View key={i} style={styles.nudgeRow}>
-                <Text style={styles.nudgeText}>• {nudge}</Text>
-              </View>
-            ))}
-          </InsightCard>
-        )}
 
         {/* Bottom spacer */}
         <View style={{ height: 40 }} />

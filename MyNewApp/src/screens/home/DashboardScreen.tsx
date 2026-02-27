@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
 
     header: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingTop: 54, paddingHorizontal: 20, paddingBottom: 14,
+        paddingTop: 48, paddingHorizontal: 16, paddingBottom: 10,
         borderBottomWidth: 1, borderBottomColor: theme.colors.border,
     },
     backBtn: {

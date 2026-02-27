@@ -47,18 +47,11 @@ const RootNavigator = () => {
                     <Stack.Screen
                         name="AppTabs"
                         component={AppTabs}
-                        options={({ navigation }) => ({
+                        options={{
                             headerShown: true,
                             title: 'HealthLink',
                             headerStyle: darkHeaderStyle,
-                            headerRight: () => (
-                                <Button
-                                    onPress={() => navigation.navigate('Doctor')}
-                                    title="Dr."
-                                    color={theme.colors.primary}
-                                />
-                            )
-                        })}
+                        }}
                     />
                     <Stack.Screen
                         name="Doctor"
