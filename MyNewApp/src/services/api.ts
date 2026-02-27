@@ -90,6 +90,9 @@ export const reportsAPI = {
 
     /** Get full details (including extracted data) for a single report. */
     detail: (reportId: string) => fetchClient(`/reports/detail/${encodeURIComponent(reportId)}`, { method: 'GET' }),
+
+    /** Get aggregated lab history for all parameters across all reports. */
+    labHistory: (userPhone: string) => fetchClient(`/api/lab-history/${encodeURIComponent(userPhone)}`, { method: 'GET' }),
 };
 
 // Default export if needed, though we should prefer named exports
