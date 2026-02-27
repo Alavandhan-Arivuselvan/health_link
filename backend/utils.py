@@ -26,7 +26,6 @@ from sentence_transformers import SentenceTransformer
 
 from huggingface_hub import InferenceClient
 
-from pyvis.network import Network
 
 from dotenv import load_dotenv
 
@@ -453,133 +452,6 @@ def update_vector_store(user_phone, parsed_json, doc_date):
 
     print(f"✅ Vectors Updated: Indexed {len(vector_docs)} clinical facts.")
 
-
-
-# =========================================================
-
-# 5. STEP 4: GENERATE PYVIS GRAPH
-
-# =========================================================
-# =========================================================
-# 5. STEP 4: GENERATE PYVIS GRAPH
-# =========================================================
-
-
-def generate_patient_graph(user_phone, output_file="healthlink_interactive.html"):
-    print(f"🕸️ Generating semantic graph for {user_phone}...")
-    user_doc = db["users"].find_one({"_id": user_phone})
-    if not user_doc:
-        print(f"❌ No data found for {user_phone}.")
-        return None
-
-    net = Network(height="100vh", width="100vw", bgcolor="#0b0f19", font_color="white", heading="HealthLink: Semantic Patient Knowledge Graph")
-    
-    # Enable native hover and dragging
-    net.set_options("""
-    {
-      "interaction": { "hover": true, "dragNodes": true, "zoomView": true }, 
-      "physics": {
-          "forceAtlas2Based": {"gravitationalConstant": -100, "centralGravity": 0.01, "springLength": 100},
-          "minVelocity": 0.75,
-          "solver": "forceAtlas2Based"
-      }
-    }
-    """)
-
-    profile = user_doc.get("profile", {})
-    patient_name = profile.get("full_name", "Unknown Patient")
-    p_age = profile.get("age", "N/A")
-    p_gender = profile.get("gender", "N/A")
-
-    # 🔥 FIX 1: Plain text Patient Tooltip
-    patient_tooltip = f"👤 PATIENT PROFILE\n====================\nName: {patient_name}\nAge: {p_age}\nGender: {p_gender}\nID: {user_phone}"
-    net.add_node(patient_name, label=patient_name, title=patient_tooltip, color="#ef4444", size=40, shape="diamond")
-    
-    timeline = user_doc.get("timeline", {})
-    color_map = {"Diagnosis": "#f97316", "Medication": "#06b6d4", "Vital": "#a855f7", "Other": "#8b5cf6"}
-
-    for date_str in sorted(timeline.keys()):
-        data = timeline[date_str]
-        hospital = data.get("meta", {}).get("primary_hospital", "Unknown Hospital")
-        date_node_id = f"DATE_{date_str}"
-        
-        # 🔥 FIX 2: Plain text Date Tooltip
-        date_tooltip = f"🏥 VISIT DETAILS\n--------------------\nDate: {date_str}\nFacility: {hospital}"
-        
-        net.add_node(date_node_id, label=date_str, title=date_tooltip, color="#eab308", size=25, shape="hexagon")
-        net.add_edge(patient_name, date_node_id, color="#475569", width=2)
-
-        categorized = {}
-        for ev in data.get("clinical_events", []):
-            if isinstance(ev, dict):
-                categorized.setdefault(ev.get("category", "Other"), []).append(ev)
-
-        for category, items in categorized.items():
-            cat_node_id = f"CAT_{date_str}_{category}"
-            cat_color = color_map.get(category, "#ffffff")
-            net.add_node(cat_node_id, label=category, color=cat_color, size=15, shape="box")
-            net.add_edge(date_node_id, cat_node_id, color="#475569", width=1, dashes=True)
-            
-            for item in items:
-                item_name = str(item.get("item", "Unknown")).upper()
-                global_item_id = f"GLOBAL_{category}{item_name}{date_str}"
-                
-                # 🔥 FIX 3: Plain text Item Tooltip with bullet points
-                hover_details = "\n".join([f"• {k.title()}: {v}" for k, v in item.items() if k not in ["category", "item", "source_doc_id"]])
-                item_tooltip = f"📌 {item_name}\n--------------------\n{hover_details}"
-                
-                net.add_node(global_item_id, label=item_name, title=item_tooltip, color=cat_color, size=12, shape="dot")
-                net.add_edge(cat_node_id, global_item_id, color=cat_color, width=1.5)
-
-    net.save_graph(output_file)
-
-    # Clean, lightweight JS just for the neighbor highlight (no tooltip hijacking!)
-    safe_injection = """
-    <script type="text/javascript">
-        network.on("hoverNode", function (params) {
-            try {
-                network.canvas.body.container.style.cursor = 'pointer';
-                var hover_id = params.node;
-                var connected_nodes = network.getConnectedNodes(hover_id);
-                connected_nodes.push(hover_id);
-                
-                var updateArray = [];
-                nodes.forEach(function(node) {
-                    if (!node.hiddenColor) { node.hiddenColor = node.color; }
-                    if (connected_nodes.includes(node.id)) {
-                        updateArray.push({id: node.id, color: node.hiddenColor, font: {color: 'white'}});
-                    } else {
-                        updateArray.push({id: node.id, color: 'rgba(50,50,50,0.3)', font: {color: 'rgba(50,50,50,0.3)'}});
-                    }
-                });
-                nodes.update(updateArray);
-            } catch (err) { }
-        });
-
-        network.on("blurNode", function (params) {
-            try {
-                network.canvas.body.container.style.cursor = 'default';
-                var updateArray = [];
-                nodes.forEach(function(node) {
-                    if (node.hiddenColor) {
-                        updateArray.push({id: node.id, color: node.hiddenColor, font: {color: 'white'}});
-                    }
-                });
-                nodes.update(updateArray);
-            } catch (err) { }
-        });
-    </script>
-    """
-    
-    with open(output_file, "r+", encoding="utf-8") as f:
-        html_content = f.read()
-        html_content = html_content.replace("</body>", safe_injection + "\n</body>")
-        f.seek(0)
-        f.write(html_content)
-        f.truncate()
-
-    print(f"🎉 Fully Styled Graph saved to {output_file}")
-    return output_file
 # =========================================================
 
 # 6. STEP 5: RAG CHATBOT ENGINE
@@ -974,11 +846,11 @@ def process_real_smartwatch_data(user_phone, raw_data_dict):
 
     update_vector_store(user_phone, simulated_json, doc_date)
 
-    graph_file = generate_patient_graph(user_phone)
+    # Graph is now handled by Neo4j (via /api/graph-html)
 
 
 
-    print(f"🎉 ML Data fully integrated! Graph updated and saved to {graph_file}")
+    print(f"🎉 ML Data fully integrated!")
 
 
 
@@ -1039,7 +911,7 @@ def process_medical_file(user_phone: str, file_path: str):
         print(f"💾 Pushing {doc_id} data to MongoDB and updating Graph...")
         doc_date = update_user_timeline(user_phone, parsed_json, doc_id)
         update_vector_store(user_phone, parsed_json, doc_date)
-        generate_patient_graph(user_phone) 
+        # Graph is now handled by Neo4j (via /api/graph-html)
         
         return {
             "status": "success", 

@@ -40,8 +40,7 @@ def read_pdf(path: str) -> str:
     try:
         import fitz  # pymupdf
     except ImportError:
-        print("\n  ✗ pymupdf is not installed. Run: pip install pymupdf")
-        sys.exit(1)
+        raise ImportError("pymupdf is not installed. Run: pip install pymupdf")
 
     doc = fitz.open(path)
     page_count = doc.page_count
@@ -51,9 +50,7 @@ def read_pdf(path: str) -> str:
     full_text = "\n".join(pages_text).strip()
 
     if not full_text:
-        print("  ⚠ PDF appears to be scanned (image-only) — no text extracted.")
-        print("  Please use a digitally created PDF or convert it to text first.")
-        sys.exit(1)
+        raise ValueError(f"PDF appears to be scanned (image-only) — no text extracted from {path}")
 
     print(f"  ✓ PDF read: {page_count} pages, {len(full_text)} chars")
     return full_text
