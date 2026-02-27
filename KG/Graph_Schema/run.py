@@ -211,7 +211,7 @@ def test_connections():
     try:
         from google import genai as genai_sdk
         c = genai_sdk.Client(api_key=os.environ["GEMINI_API_KEY"])
-        c.models.generate_content(model="gemini-2.0-flash", contents="Say OK")
+        c.models.generate_content(model="gemini-3-flash-preview", contents="Say OK")
         success("Gemini connected.")
     except Exception as e:
         error(f"Gemini connection failed: {e}")
