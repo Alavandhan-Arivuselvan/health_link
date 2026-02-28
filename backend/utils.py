@@ -26,7 +26,6 @@ from sentence_transformers import SentenceTransformer
 
 from huggingface_hub import InferenceClient
 
-from pyvis.network import Network
 
 from dotenv import load_dotenv
 
@@ -453,165 +452,6 @@ def update_vector_store(user_phone, parsed_json, doc_date):
 
     print(f"✅ Vectors Updated: Indexed {len(vector_docs)} clinical facts.")
 
-
-
-# =========================================================
-
-# 5. STEP 4: GENERATE PYVIS GRAPH
-
-# =========================================================
-# =========================================================
-# 5. STEP 4: GENERATE PYVIS GRAPH
-# =========================================================
-def generate_patient_graph(user_phone, output_file="healthlink_interactive.html"):
-    print(f"🕸️ Generating semantic graph for {user_phone}...")
-    user_doc = db["users"].find_one({"_id": user_phone})
-    if not user_doc:
-        print(f"❌ No data found for {user_phone}.")
-        return None
-
-    net = Network(height="100vh", width="100%", bgcolor="#0b0f19", font_color="white")
-    net.set_options('{"interaction": { "hover": true, "zoomView": true, "navigationButtons": true }, "physics": {"forceAtlas2Based": {"gravitationalConstant": -150, "centralGravity": 0.02, "springLength": 100, "springConstant": 0.05}, "solver": "forceAtlas2Based", "stabilization": {"iterations": 150}}}')
-
-    profile = user_doc.get("profile") or {}
-
-    # 🔥 THE BULLETPROOF NAME FIX 🔥
-    raw_name = profile.get("full_name")
-    
-    if isinstance(raw_name, list):  
-        raw_name = raw_name[0] if raw_name else "Unknown Patient"
-        
-    patient_name = str(raw_name).strip() if raw_name else "Unknown Patient"
-    
-    if patient_name.lower() in ["none", "null", ""]:
-        patient_name = "Unknown Patient"
-
-    p_age = str(profile.get("age", "N/A"))
-    p_gender = str(profile.get("gender", "N/A"))
-
-    patient_tooltip = f"""<div style="font-family: Arial; padding: 10px; background: #1e293b; border-radius: 8px; border: 1px solid #334155;"><h3 style="margin:0 0 5px 0; color: #38bdf8;">{patient_name}</h3><b>Age:</b> {p_age} <br><b>Gender:</b> {p_gender} <br><b>ID:</b> {user_phone}</div>"""
-    
-    net.add_node(patient_name, label=patient_name, title=patient_tooltip, color="#ef4444", size=40, shape="diamond")
-    
-    timeline = user_doc.get("timeline", {})
-    
-    # 🔥 UPDATED COLOR MAP FOR NEW SYMPTOMS AND LABS
-    color_map = {
-        "Diagnosis": "#f97316", 
-        "Medication": "#06b6d4", 
-        "Vital": "#a855f7", 
-        "Symptom": "#ef4444", 
-        "Lab Result": "#10b981", 
-        "Other": "#8b5cf6"
-    }
-
-    # 🔥 THE RESTORED TIMELINE LOOP 🔥
-    for date_str in sorted(timeline.keys()):
-        hospital = timeline[date_str].get("meta", {}).get("primary_hospital", "Unknown Hospital")
-        date_node_id = f"DATE_{date_str}"
-        date_tooltip = f"<div style='padding:5px;'><b>Visit Date:</b> {date_str}<br><b>Facility:</b> {hospital}</div>"
-        
-        net.add_node(date_node_id, label=date_str, title=date_tooltip, color="#eab308", size=25, shape="hexagon")
-        net.add_edge(patient_name, date_node_id, color="#475569", width=2)
-
-        events = timeline[date_str].get("clinical_events", [])
-        categorized = {}
-        for ev in events:
-            if isinstance(ev, dict):
-                categorized.setdefault(ev.get("category", "Other"), []).append(ev)
-
-        for category, items in categorized.items():
-            cat_node_id = f"CAT_{date_str}_{category}"
-            cat_color = color_map.get(category, "#ffffff")
-            net.add_node(cat_node_id, label=category, color=cat_color, size=15, shape="box")
-            net.add_edge(date_node_id, cat_node_id, color="#475569", width=1, dashes=True)
-            
-            for item in items:
-                item_name = str(item.get("item", "Unknown")).upper()
-                global_item_id = f"GLOBAL_{category}_{item_name}"
-                hover_details = "".join([f"<b>{k.title()}</b>: {v}<br>" for k, v in item.items() if k not in ["category", "item", "source_doc_id"]])
-                item_tooltip = f"""<div style="font-family: Arial; padding: 8px; background: #0f172a; border-radius: 5px; border: 1px solid {cat_color};"><span style="color: {cat_color}; font-weight: bold;">{item_name}</span><br><hr style="border-color: #334155; margin: 5px 0;"><span style="font-size: 13px;">{hover_details}</span></div>"""
-                
-                net.add_node(global_item_id, label=item_name, title=item_tooltip, color=cat_color, size=12, shape="dot")
-                net.add_edge(cat_node_id, global_item_id, color=cat_color, width=1.5)
-
-    net.save_graph(output_file)
-
-    js_injection = """
-    <script type="text/javascript">
-        network.on("hoverNode", function (params) {
-            var hover_id = params.node;
-            var connected_nodes = network.getConnectedNodes(hover_id);
-            connected_nodes.push(hover_id);
-            var all_nodes = nodes.get();
-            var node_updates = [];
-            for (var i = 0; i < all_nodes.length; i++) {
-                var node = all_nodes[i];
-                if (node.original_color === undefined) { node.original_color = node.color; }
-                if (connected_nodes.includes(node.id)) {
-                    node_updates.push({id: node.id, color: node.original_color, font: {color: 'white'}});
-                } else {
-                    node_updates.push({id: node.id, color: 'rgba(50,50,50,0.2)', font: {color: 'rgba(255,255,255,0.05)'}});
-                }
-            }
-            nodes.update(node_updates);
-            var connected_edges = network.getConnectedEdges(hover_id);
-            var all_edges = edges.get();
-            var edge_updates = [];
-            for (var i = 0; i < all_edges.length; i++) {
-                var edge = all_edges[i];
-                if (edge.original_color === undefined) { edge.original_color = edge.color || '#475569'; }
-                if (connected_edges.includes(edge.id)) {
-                    edge_updates.push({id: edge.id, color: '#94a3b8', width: 3});
-                } else {
-                    edge_updates.push({id: edge.id, color: 'rgba(50,50,50,0.1)', width: 1});
-                }
-            }
-            edges.update(edge_updates);
-        });
-        network.on("blurNode", function (params) {
-            var all_nodes = nodes.get();
-            var node_updates = [];
-            for (var i = 0; i < all_nodes.length; i++) {
-                if (all_nodes[i].original_color !== undefined) {
-                    node_updates.push({id: all_nodes[i].id, color: all_nodes[i].original_color, font: {color: 'white'}});
-                }
-            }
-            nodes.update(node_updates);
-            var all_edges = edges.get();
-            var edge_updates = [];
-            for (var i = 0; i < all_edges.length; i++) {
-                if (all_edges[i].original_color !== undefined) {
-                    edge_updates.push({id: all_edges[i].id, color: all_edges[i].original_color, width: (all_edges[i].dashes ? 1 : 2)});
-                }
-            }
-            edges.update(edge_updates);
-        });
-    </script>
-    """
-    
-    css_injection = """
-    <style>
-        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #0b0f19; }
-        #mynetwork { width: 100%; height: 100vh; background-color: #0b0f19; border: none; }
-        .card { margin: 0; padding: 0; border: none; height: 100%; }
-        h1, center { display: none; }
-    </style>
-    """
-    
-    with open(output_file, "r+", encoding="utf-8") as f:
-        html_content = f.read()
-        html_content = html_content.replace("</body>", js_injection + "\n</body>")
-        html_content = html_content.replace("</head>", css_injection + "\n</head>")
-        html_content = html_content.replace('<script src="lib/bindings/utils.js"></script>', '')
-        f.seek(0)
-        f.write(html_content)
-        f.truncate()
-
-    print(f"🎉 Fully Styled Graph saved to {output_file}")
-    return output_file
-
-
 # =========================================================
 
 # 6. STEP 5: RAG CHATBOT ENGINE
@@ -1006,11 +846,11 @@ def process_real_smartwatch_data(user_phone, raw_data_dict):
 
     update_vector_store(user_phone, simulated_json, doc_date)
 
-    graph_file = generate_patient_graph(user_phone)
+    # Graph is now handled by Neo4j (via /api/graph-html)
 
 
 
-    print(f"🎉 ML Data fully integrated! Graph updated and saved to {graph_file}")
+    print(f"🎉 ML Data fully integrated!")
 
 
 
@@ -1071,7 +911,7 @@ def process_medical_file(user_phone: str, file_path: str):
         print(f"💾 Pushing {doc_id} data to MongoDB and updating Graph...")
         doc_date = update_user_timeline(user_phone, parsed_json, doc_id)
         update_vector_store(user_phone, parsed_json, doc_date)
-        generate_patient_graph(user_phone) 
+        # Graph is now handled by Neo4j (via /api/graph-html)
         
         return {
             "status": "success", 

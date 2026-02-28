@@ -18,3 +18,15 @@ backend/__pycache__/
 Frontend/__pycache__/
 backend/demo.html
 backend/run_backend.bat
+KG/reports/.env
+KG/Graph_Schema/.env
+KG/Graph_Schema/__pycache__/
+ML/fitbit_2weeks_data.json
+ML/toke.txt
+antlogy/Loinc_2.82
+ontology/Loinc_2.82
+backend/healthlink_interactive.html
+backend/uploads/
+
+KG/GraphRag/.env
+KG/GraphRag/__pycache__/
