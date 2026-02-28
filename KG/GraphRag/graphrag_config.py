@@ -1,5 +1,5 @@
 """
-config.py — Shared config for GraphRag.
+graphrag_config.py — Shared config for GraphRag.
 Reuses the same .env file as GraphSchema (NEO4J + GEMINI credentials).
 """
 

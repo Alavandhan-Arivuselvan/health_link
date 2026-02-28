@@ -732,6 +732,22 @@ except Exception as _ne:
     _NEO4J_BRIDGE = False
     print(f"⚠️  neo4j_bridge not loaded: {_ne}")
 # ──────────────────────────────────────────────────────────────────────────────
+
+# ── GraphRag chatbot (non-fatal — falls back to error if unavailable) ─────────
+_GRAPHRAG_AVAILABLE = False
+try:
+    GRAPHRAG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "KG", "GraphRag")
+    import sys as _sys2
+    _sys2.path.insert(0, GRAPHRAG_DIR)
+    from query_engine import query as graphrag_query, ConversationHistory
+    _GRAPHRAG_AVAILABLE = True
+    _user_conversations: dict[str, ConversationHistory] = {}  # per-user chat history
+    print("✅ GraphRag query engine loaded.")
+except Exception as _gre:
+    _GRAPHRAG_AVAILABLE = False
+    print(f"⚠️  GraphRag not loaded: {_gre}")
+    import traceback; traceback.print_exc()
+# ──────────────────────────────────────────────────────────────────────────────
 from twilio.rest import Client
 from supabase import create_client, Client as SupabaseClient
 import bcrypt
@@ -1174,9 +1190,27 @@ def calculate_weekly_risk(week_data):
 def chat(payload: dict = Body(...)):
     user_phone = payload.get("user_phone", "")
     message = payload.get("message", "")
-    text = message.lower()
-    ans = start_interactive_chat(user_phone, text)
-    return {"reply": ans}
+
+    if not _GRAPHRAG_AVAILABLE:
+        return {"reply": "Chat is temporarily unavailable. GraphRag engine not loaded.", "mode": "error"}
+
+    # Get or create per-user conversation history
+    if user_phone not in _user_conversations:
+        _user_conversations[user_phone] = ConversationHistory()
+    history = _user_conversations[user_phone]
+
+    try:
+        result = graphrag_query(message, history)
+        return {
+            "reply": result["answer"],
+            "mode": result.get("mode", ""),
+            "entities": result.get("entities_matched", {}),
+            "graph_stats": result.get("graph_stats", {}),
+        }
+    except Exception as e:
+        print(f"❌ GraphRag error: {e}")
+        import traceback; traceback.print_exc()
+        return {"reply": f"Sorry, I encountered an error processing your question. Please try again.", "mode": "error"}
 
 @app.post("/save-stats")
 def save_stats(stats: dict):
@@ -1205,9 +1239,8 @@ async def get_stats(week_type: str):
 @app.post("/qr")
 def get_qr(payload: dict = Body(...)):
     user_phone = payload.get("user_phone", "")
-    # Generate a URL pointing to this user's health profile
-    qr_url = f"http://{os.environ.get('HOST_IP', '192.168.1.100')}:9000/profile/{user_phone}"
-    return {"url": qr_url, "user_phone": user_phone}
+    # QR encodes just the patient phone — session token is created at scan time
+    return {"url": user_phone, "user_phone": user_phone}
 
 @app.get("/profile/{phone}")
 def get_profile(phone: str):
@@ -1521,3 +1554,153 @@ fetch('./graph-data')
 </body>
 </html>
 """)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DOCTOR SESSION MANAGEMENT — QR-based temporary access (1 hour)
+# ══════════════════════════════════════════════════════════════════════════════
+
+import uuid
+from datetime import datetime as _dt, timedelta as _td
+
+# In-memory session store: { token: { patient_phone, doctor_license, expires_at } }
+_doctor_sessions: dict[str, dict] = {}
+DOCTOR_SESSION_TTL = _td(hours=1)
+
+
+def _cleanup_sessions():
+    """Remove expired sessions."""
+    now = _dt.utcnow()
+    expired = [t for t, s in _doctor_sessions.items() if s["expires_at"] < now]
+    for t in expired:
+        del _doctor_sessions[t]
+
+
+def _validate_session(token: str) -> dict:
+    """Validate a session token. Returns session dict or raises 401/403."""
+    _cleanup_sessions()
+    session = _doctor_sessions.get(token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Session expired or invalid. Please scan the QR code again.")
+    if session["expires_at"] < _dt.utcnow():
+        del _doctor_sessions[token]
+        raise HTTPException(status_code=401, detail="Session expired. Please scan the QR code again.")
+    return session
+
+
+@app.post("/api/doctor/scan")
+def doctor_scan(payload: dict = Body(...)):
+    """
+    Doctor scans patient QR code.
+    Expects: { patient_phone, doctor_license }
+    Returns: { token, patient_phone, expires_at, ttl_seconds }
+    """
+    patient_phone = payload.get("patient_phone", "").strip()
+    doctor_license = payload.get("doctor_license", "").strip()
+
+    if not patient_phone or not doctor_license:
+        raise HTTPException(status_code=400, detail="patient_phone and doctor_license are required")
+
+    # Verify patient exists in Supabase
+    try:
+        result = supabase.table("users").select("phone").eq("phone", patient_phone).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Patient not found")
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # If Supabase is down, still allow (graceful)
+
+    # Create session token
+    token = str(uuid.uuid4())
+    expires_at = _dt.utcnow() + DOCTOR_SESSION_TTL
+
+    _doctor_sessions[token] = {
+        "patient_phone": patient_phone,
+        "doctor_license": doctor_license,
+        "expires_at": expires_at,
+        "created_at": _dt.utcnow(),
+    }
+
+    print(f"✅ Doctor session created: {doctor_license} → patient {patient_phone} (expires {expires_at})")
+
+    return {
+        "token": token,
+        "patient_phone": patient_phone,
+        "expires_at": expires_at.isoformat(),
+        "ttl_seconds": int(DOCTOR_SESSION_TTL.total_seconds()),
+    }
+
+
+@app.post("/api/doctor/patient-graph")
+def doctor_patient_graph(payload: dict = Body(...)):
+    """
+    Returns the patient's Neo4j graph data for the doctor.
+    Expects: { token }
+    """
+    token = payload.get("token", "")
+    session = _validate_session(token)
+
+    if not _NEO4J_BRIDGE:
+        raise HTTPException(status_code=503, detail="Neo4j is not connected")
+
+    data = get_graph_data()
+    remaining = int((session["expires_at"] - _dt.utcnow()).total_seconds())
+    return {"graph": data, "patient_phone": session["patient_phone"], "remaining_seconds": remaining}
+
+
+@app.post("/api/doctor/patient-chat")
+def doctor_patient_chat(payload: dict = Body(...)):
+    """
+    Doctor chats about a patient's health data using GraphRag.
+    Expects: { token, message }
+    """
+    token = payload.get("token", "")
+    message = payload.get("message", "")
+    session = _validate_session(token)
+
+    if not _GRAPHRAG_AVAILABLE:
+        return {"reply": "Chat is temporarily unavailable.", "mode": "error"}
+
+    # Use a doctor-specific conversation key so histories don't clash with patient's own chat
+    conv_key = f"doc_{session['doctor_license']}_{session['patient_phone']}"
+    if conv_key not in _user_conversations:
+        _user_conversations[conv_key] = ConversationHistory()
+    history = _user_conversations[conv_key]
+
+    try:
+        result = graphrag_query(message, history, role="doctor")
+        remaining = int((session["expires_at"] - _dt.utcnow()).total_seconds())
+        return {
+            "reply": result["answer"],
+            "mode": result.get("mode", ""),
+            "entities": result.get("entities_matched", {}),
+            "remaining_seconds": remaining,
+        }
+    except Exception as e:
+        print(f"❌ Doctor chat error: {e}")
+        import traceback; traceback.print_exc()
+        return {"reply": "Sorry, I encountered an error. Please try again.", "mode": "error"}
+
+
+@app.post("/api/doctor/session-status")
+def doctor_session_status(payload: dict = Body(...)):
+    """
+    Check if a doctor session is still valid.
+    Expects: { token }
+    Returns: { valid, remaining_seconds, patient_phone }
+    """
+    token = payload.get("token", "")
+    _cleanup_sessions()
+    session = _doctor_sessions.get(token)
+
+    if not session or session["expires_at"] < _dt.utcnow():
+        return {"valid": False, "remaining_seconds": 0, "patient_phone": ""}
+
+    remaining = int((session["expires_at"] - _dt.utcnow()).total_seconds())
+    return {
+        "valid": True,
+        "remaining_seconds": remaining,
+        "patient_phone": session["patient_phone"],
+    }
+

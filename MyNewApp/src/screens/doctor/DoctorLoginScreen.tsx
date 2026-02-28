@@ -4,7 +4,7 @@ import { View, StyleSheet, Text, Alert, KeyboardAvoidingView, ScrollView, Platfo
 import GradientBackground from '../../components/GradientBackground';
 import CustomInput from '../../components/CustomInput';
 import CustomButton from '../../components/CustomButton';
-import { doctorAPI } from '../../services/api';
+import { doctorAPI, authAPI } from '../../services/api';
 import { theme } from '../../theme';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -12,27 +12,56 @@ import { Ionicons } from '@expo/vector-icons';
 
 const DoctorLoginScreen = () => {
     const navigation = useNavigation();
+    const [step, setStep] = useState(1); // 1=credentials, 2=OTP
     const [licenseNumber, setLicenseNumber] = useState('');
+    const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+    const [otp, setOtp] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleLogin = async () => {
-        if (!licenseNumber || !password) {
-            Alert.alert('Error', 'Please enter your license number and password');
+        if (!licenseNumber || !password || !phone) {
+            Alert.alert('Error', 'Please fill in all fields');
             return;
         }
         setLoading(true);
         try {
             const response = await doctorAPI.login({ license_number: licenseNumber, password });
             if (response.data.status === 'success') {
-                await AsyncStorage.setItem('doctor_license', licenseNumber);
-                await AsyncStorage.setItem('user_role', 'doctor');
-                navigation.reset({ index: 0, routes: [{ name: 'AppTabs' as never }] });
+                // Save doctor name for greeting
+                const doctorName = response.data.doctor?.name || '';
+                await AsyncStorage.setItem('doctor_name', doctorName);
+                // Credentials valid — send OTP
+                await authAPI.sendOTP({ phone });
+                setStep(2);
             } else {
                 Alert.alert('Login Failed', response.data.message);
             }
         } catch (error) {
             Alert.alert('Error', 'Login failed. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerifyOTP = async () => {
+        if (!otp) {
+            Alert.alert('Error', 'Please enter the OTP');
+            return;
+        }
+        setLoading(true);
+        try {
+            const response = await authAPI.verifyOTP({ phone, otp });
+            if (response.data.status === 'success') {
+                await AsyncStorage.setItem('doctor_license', licenseNumber);
+                await AsyncStorage.setItem('doctor_phone', phone);
+                await AsyncStorage.setItem('user_role', 'doctor');
+                navigation.reset({ index: 0, routes: [{ name: 'AppTabs' as never }] });
+            } else {
+                Alert.alert('Verification Failed', response.data.message);
+            }
+        } catch (error) {
+            Alert.alert('Error', 'OTP verification failed.');
         } finally {
             setLoading(false);
         }
@@ -52,27 +81,51 @@ const DoctorLoginScreen = () => {
                     </View>
 
                     <View style={styles.card}>
-                        <Text style={styles.title}>Doctor Login</Text>
-                        <Text style={styles.subtitle}>Sign in with your medical credentials</Text>
+                        <Text style={styles.title}>{step === 1 ? 'Doctor Login' : 'Verify OTP'}</Text>
 
-                        <CustomInput
-                            label="Medical License Number"
-                            placeholder="e.g. MCI-12345"
-                            value={licenseNumber}
-                            onChangeText={setLicenseNumber}
-                            autoCapitalize="characters"
-                        />
-                        <CustomInput
-                            label="Password"
-                            placeholder="Enter your password"
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                        />
-
-                        <CustomButton title="Login" onPress={handleLogin} loading={loading} />
-                        <CustomButton title="Register as Doctor" type="outline" onPress={() => navigation.navigate('DoctorRegister' as never)} />
-                        <CustomButton title="← Patient Login" type="outline" onPress={() => navigation.navigate('Login' as never)} />
+                        {step === 1 ? (
+                            <>
+                                <Text style={styles.subtitle}>Sign in with your medical credentials</Text>
+                                <CustomInput
+                                    label="Medical License Number"
+                                    placeholder="e.g. MCI-12345"
+                                    value={licenseNumber}
+                                    onChangeText={setLicenseNumber}
+                                    autoCapitalize="characters"
+                                />
+                                <CustomInput
+                                    label="Phone Number"
+                                    placeholder="Enter your phone number"
+                                    value={phone}
+                                    onChangeText={setPhone}
+                                    keyboardType="phone-pad"
+                                />
+                                <CustomInput
+                                    label="Password"
+                                    placeholder="Enter your password"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry
+                                />
+                                <CustomButton title="Login" onPress={handleLogin} loading={loading} />
+                                <CustomButton title="Register as Doctor" type="outline" onPress={() => navigation.navigate('DoctorRegister' as never)} />
+                                <CustomButton title="← Patient Login" type="outline" onPress={() => navigation.navigate('Login' as never)} />
+                            </>
+                        ) : (
+                            <>
+                                <Text style={styles.subtitle}>OTP sent to {phone}</Text>
+                                <CustomInput
+                                    label="Enter OTP"
+                                    placeholder="XXXX"
+                                    value={otp}
+                                    onChangeText={setOtp}
+                                    keyboardType="number-pad"
+                                    maxLength={4}
+                                />
+                                <CustomButton title="Verify & Login" onPress={handleVerifyOTP} loading={loading} />
+                                <CustomButton title="Back" type="outline" onPress={() => setStep(1)} />
+                            </>
+                        )}
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
