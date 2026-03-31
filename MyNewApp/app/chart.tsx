@@ -120,7 +120,7 @@
 //               <Text style={styles.badgeText}>{analysis?.verdict}</Text>
 //             </View>
 //           </View>
-          
+
 //           <RiskBar label="Heart Health" percentage={analysis?.heartProb || 0} />
 //           <RiskBar label="Obesity Risk" percentage={analysis?.obesityProb || 0} />
 //           <RiskBar label="Respiratory Risk" percentage={analysis?.respProb || 0} />
@@ -158,9 +158,9 @@
 //   chartTitle: { color: '#FFF', fontSize: 16, marginLeft: 10, marginTop: 5 }
 // });
 import React, { useState, useEffect } from 'react';
-import { 
-  StyleSheet, Text, View, ScrollView, TouchableOpacity, 
-  Dimensions, ActivityIndicator, SafeAreaView, StatusBar 
+import {
+  StyleSheet, Text, View, ScrollView, TouchableOpacity,
+  Dimensions, ActivityIndicator, SafeAreaView, StatusBar
 } from 'react-native';
 import axios from 'axios';
 import { LineChart } from 'react-native-chart-kit';
@@ -193,9 +193,9 @@ interface ApiResponse {
 // --- Responsive Risk Bar Component ---
 const RiskBar: React.FC<{ label: string; percentage: number }> = ({ label, percentage }) => {
   const getBarColor = (perc: number) => {
-    if (perc < 30) return '#4CAF50'; 
-    if (perc < 70) return '#FFB300'; 
-    return '#FF5252';                
+    if (perc < 30) return '#4CAF50';
+    if (perc < 70) return '#FFB300';
+    return '#FF5252';
   };
 
   return (
@@ -221,7 +221,7 @@ export default function HealthDashboard() {
   const [loading, setLoading] = useState<boolean>(true);
 
   // Use your local IP for physical devices, or 10.0.2.2 for Android Emulator
-  const API_URL = `http://172.16.23.234:8000/api/health-stats/${selectedWeek}`;
+  const API_URL = `http://192.168.1.100:9000/api/health-stats/${selectedWeek}`;
 
   const fetchData = async () => {
     setLoading(true);
@@ -249,10 +249,10 @@ export default function HealthDashboard() {
         <LineChart
           data={{
             // SPLIT LOGIC: Takes the "06" from "2026-02-06"
-            labels: data.map(d => d.Date.split('-')[2]), 
+            labels: data.map(d => d.Date.split('-')[2]),
             datasets: [{ data: values, strokeWidth: 3 }]
           }}
-          width={screenWidth - 40} 
+          width={screenWidth - 40}
           height={220}
           chartConfig={{
             backgroundColor: "#1E1E1E",
@@ -264,9 +264,9 @@ export default function HealthDashboard() {
             propsForLabels: { fontSize: 10 },
             propsForDots: { r: "5", strokeWidth: "2", stroke: color(1) },
             propsForBackgroundLines: {
-                strokeDasharray: "5, 5",
-                strokeWidth: 1,
-                stroke: "rgba(255, 255, 255, 0.1)"
+              strokeDasharray: "5, 5",
+              strokeWidth: 1,
+              stroke: "rgba(255, 255, 255, 0.1)"
             }
           }}
           bezier
@@ -283,7 +283,7 @@ export default function HealthDashboard() {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color="#BB86FC" />
-        <Text style={{color: '#888', marginTop: 10}}>Running Random Forest...</Text>
+        <Text style={{ color: '#888', marginTop: 10 }}>Running Random Forest...</Text>
       </View>
     );
   }
@@ -292,13 +292,13 @@ export default function HealthDashboard() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-        
+
         <Text style={styles.header}>Agiless Analytics</Text>
 
         {/* Filter Toggle */}
         <View style={styles.filterContainer}>
           {(['past', 'current'] as const).map((week) => (
-            <TouchableOpacity 
+            <TouchableOpacity
               key={week}
               style={[styles.filterBtn, selectedWeek === week && styles.activeBtn]}
               onPress={() => setSelectedWeek(week)}
@@ -318,7 +318,7 @@ export default function HealthDashboard() {
               <Text style={styles.badgeText}>{analysis?.verdict}</Text>
             </View>
           </View>
-          
+
           <RiskBar label="Heart Wellness" percentage={analysis?.heartProb || 0} />
           <RiskBar label="Obesity Index" percentage={analysis?.obesityProb || 0} />
           <RiskBar label="Respiratory Score" percentage={analysis?.respProb || 0} />
