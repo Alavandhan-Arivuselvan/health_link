@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 # ================== YOUR SETTINGS ==================
-ACCESS_TOKEN = ""          # ← From your auth script (#access_token=...)
+ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIyM1Y1UjUiLCJzdWIiOiJEM1E5SEQiLCJpc3MiOiJGaXRiaXQiLCJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJzY29wZXMiOiJyYWN0IHJociBycHJvIHJzbGUiLCJleHAiOjE3NzQ5Nzk2ODAsImlhdCI6MTc3NDk3NTQzNX0.ppDcirayAmd3apAfYCa-r9gO8mNVZkFAtMOme-VuwfM"          # ← From your auth script (#access_token=...)
 HEADERS = {
     "Authorization": f"Bearer {ACCESS_TOKEN}",
     "Accept-Language": "en_US"   # Optional: adjust if needed
