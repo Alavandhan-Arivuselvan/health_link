@@ -70,7 +70,7 @@ const FitbitInsightsScreen = ({ navigation }: any) => {
             await fetch(`${BASE_URL}/api/fitbit-refresh`, { method: 'POST' });
             await fetchInsights();
         } catch (e: any) {
-            Alert.alert('Refresh Failed', e.message || 'Could not refresh Fitbit data');
+            Alert.alert('Refresh Failed', e.message || 'Could not refresh Google Fit data');
             setRefreshing(false);
         }
     };
@@ -102,7 +102,7 @@ const FitbitInsightsScreen = ({ navigation }: any) => {
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
                     <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Fitbit Insights</Text>
+                <Text style={styles.headerTitle}>Google Fit Insights</Text>
                 <TouchableOpacity style={styles.backBtn} onPress={handleRefresh}>
                     <Ionicons name="refresh" size={20} color={theme.colors.textMuted} />
                 </TouchableOpacity>

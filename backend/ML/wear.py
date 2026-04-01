@@ -8,194 +8,188 @@ def parse_date(date_str):
     except:
         return None
 
-# Feature 1: Body Battery Energy Forecasting (Multi-Attribute Weighted Score)
+
+# ────────────────────────────────────────────────────────────────
+#  Google Fit JSON structure (used by ALL functions below):
+#
+#  full_data["days"]["YYYY-MM-DD"] = {
+#      "date", "steps", "resting_bpm", "avg_bpm", "min_bpm", "max_bpm",
+#      "spo2_avg", "spo2_min", "spo2_max",
+#      "sleep": { "hours_asleep", "minutes_asleep", "start_time",
+#                 "end_time", "stages": { "deep", "light", "rem", "wake" } }
+#  }
+# ────────────────────────────────────────────────────────────────
+
+
+# Feature 1: Body Battery Energy Forecasting
 def forecast_body_battery(full_data):
     """
-    Automatically extracts ALL relevant attributes from the Fitbit JSON
-    and computes a weighted 0–100 energy score to predict tomorrow's energy.
+    Predicts tomorrow's energy level (0–10 → scaled to 0–100) based on:
+      - Sleep duration  (60%)  → optimal range 7–9h
+      - Resting HR      (25%)  → lower = fitter = more energy
+      - SpO2            (15%)  → blood oxygen saturation
 
-    Attributes used (with weights):
-      - Sleep Efficiency %       (25%)  → higher = more energy recovered
-      - Sleep Duration hours     (20%)  → optimal range 7–9h
-      - Deep Sleep %             (10%)  → more deep sleep = better recovery
-      - Steps                    (15%)  → moderate activity helps recovery
-      - Resting Heart Rate       (15%)  → lower = fitter, better recovery
-      - Active Zone Minutes      (10%)  → Fat Burn + Cardio + Peak minutes
-      - Total Calories Burned     (5%)  → overall metabolic activity
-
-    Returns: forecast dict with energy_score, level, nudge, and all metrics used
+    Matches the scoring logic in analyse.py → forecast_energy().
+    Returns: forecast dict with energy_score, level, nudge, and metrics used.
     """
-    today = datetime.now().date()
-    today_str = today.strftime("%Y-%m-%d")
+    days = full_data.get("days", {})
+    today = datetime.now().date().isoformat()
 
-    # ── Extract all available data for today ─────────────────────
-    sleep_data = full_data.get("sleep", {}).get("daily_sleep", {}).get(today_str, {})
-    steps = full_data.get("steps", {}).get(today_str, 0)
-    hr_data = full_data.get("heart_rate", {}).get("daily_summaries", {}).get(today_str, {})
+    # Collect the 2 most recent days with data
+    sorted_dates = sorted(days.keys(), reverse=True)
+    recent_days = []
+    for date_str in sorted_dates:
+        d = days[date_str]
+        if d.get("sleep") and (d["sleep"].get("hours_asleep") or 0) > 0:
+            recent_days.append((date_str, d))
+            if len(recent_days) >= 2:
+                break
 
-    # Sleep metrics
-    sleep_efficiency = sleep_data.get("efficiency_percent", 0) or 0
-    minutes_asleep = sleep_data.get("minutes_asleep", 0) or 0
-    sleep_hours = round(minutes_asleep / 60, 1) if minutes_asleep else 0
-    time_in_bed = sleep_data.get("time_in_bed_minutes", 0) or 0
+    if not recent_days:
+        return {
+            "date": today,
+            "forecast": "No sleep data available",
+            "nudge": "Sync your Google Fit data to get energy forecasts",
+            "energy_level": "average",
+            "energy_score": 50,
+            "factors": {}
+        }
 
-    # Deep sleep from stages (if available)
-    stages = sleep_data.get("stages", {})
-    deep_minutes = stages.get("deep", {}).get("minutes", 0) if isinstance(stages.get("deep"), dict) else 0
-    total_sleep_stage_mins = sum(
-        s.get("minutes", 0) if isinstance(s, dict) else 0
-        for s in stages.values()
-    ) or 1  # avoid division by zero
-    deep_sleep_pct = round((deep_minutes / total_sleep_stage_mins) * 100) if deep_minutes else 0
+    # ── Average over last 2 days ─────────────────────────────────
+    sleep_vals = []
+    hr_vals = []
+    spo2_vals = []
+    steps_total = 0
 
-    # Heart rate metrics
-    resting_bpm = hr_data.get("resting_bpm", 0) or 0
-    zones = hr_data.get("zones", [])
+    for date_str, d in recent_days:
+        sleep_obj = d.get("sleep") or {}
+        h = sleep_obj.get("hours_asleep") or 0
+        if h > 0:
+            sleep_vals.append(h)
 
-    # Active zone minutes (Fat Burn + Cardio + Peak)
-    active_zone_minutes = 0
-    total_calories = 0
-    for zone in zones:
-        zone_name = zone.get("name", "")
-        mins = zone.get("minutes", 0)
-        cals = zone.get("caloriesOut", 0)
-        total_calories += cals
-        if zone_name in ("Fat Burn", "Cardio", "Peak"):
-            active_zone_minutes += mins
+        hr = d.get("latest_bpm") or d.get("avg_bpm") or d.get("resting_bpm")
+        if hr:
+            hr_vals.append(hr)
 
-    # ── Score each factor (0–100 scale) ──────────────────────────
+        sp = d.get("spo2_avg")
+        if sp:
+            spo2_vals.append(sp)
 
-    # 1. Sleep Efficiency (25%) — direct percentage
-    score_sleep_eff = min(sleep_efficiency, 100)
+        steps_total += d.get("steps") or 0
 
-    # 2. Sleep Duration (20%) — 7–9h optimal, <5h or >10h penalized
-    if sleep_hours == 0:
-        score_sleep_dur = 0
-    elif 7 <= sleep_hours <= 9:
-        score_sleep_dur = 100
-    elif 6 <= sleep_hours < 7:
-        score_sleep_dur = 70
-    elif 5 <= sleep_hours < 6:
-        score_sleep_dur = 40
-    elif sleep_hours > 9:
-        score_sleep_dur = 80  # oversleeping slightly lowers score
+    hours_asleep = round(sum(sleep_vals) / len(sleep_vals), 1) if sleep_vals else 0
+    current_hr = round(sum(hr_vals) / len(hr_vals), 1) if hr_vals else 70
+    spo2 = round(sum(spo2_vals) / len(spo2_vals), 1) if spo2_vals else 97
+    steps = steps_total
+    used_date = recent_days[0][0]  # most recent date
+
+    # ── Sleep score (0–10) ──
+    if 7 <= hours_asleep <= 9:
+        sleep_score = 10
+    elif 6 <= hours_asleep < 7:
+        sleep_score = 7.5
+    elif 9 < hours_asleep <= 10:
+        sleep_score = 8
+    elif 5 <= hours_asleep < 6:
+        sleep_score = 5
+    elif hours_asleep > 10:
+        sleep_score = 6
     else:
-        score_sleep_dur = 20  # <5h
+        sleep_score = 3
 
-    # 3. Deep Sleep % (10%) — 15–25% optimal
-    if deep_sleep_pct >= 20:
-        score_deep = 100
-    elif deep_sleep_pct >= 15:
-        score_deep = 80
-    elif deep_sleep_pct >= 10:
-        score_deep = 50
+    # ── HR score (0–10) — based on current/avg BPM ──
+    if current_hr < 60:
+        hr_score = 10
+    elif current_hr < 70:
+        hr_score = 8
+    elif current_hr < 80:
+        hr_score = 6
+    elif current_hr < 90:
+        hr_score = 4
     else:
-        score_deep = 20 if deep_sleep_pct > 0 else 0
+        hr_score = 2
 
-    # 4. Steps (15%) — 7500 target, diminishing returns above 12000
-    score_steps = min((steps / 7500) * 100, 100) if steps else 0
-
-    # 5. Resting HR (15%) — lower is better (50–60 excellent, >80 poor)
-    if resting_bpm == 0:
-        score_rhr = 50  # no data = neutral
-    elif resting_bpm <= 60:
-        score_rhr = 100
-    elif resting_bpm <= 70:
-        score_rhr = 80
-    elif resting_bpm <= 80:
-        score_rhr = 60
+    # ── SpO2 score (0–10) ──
+    if spo2 is None:
+        spo2_score = 7
+    elif spo2 >= 97:
+        spo2_score = 10
+    elif spo2 >= 95:
+        spo2_score = 7
+    elif spo2 >= 93:
+        spo2_score = 4
     else:
-        score_rhr = max(30, 100 - resting_bpm)  # penalize heavily
+        spo2_score = 2
 
-    # 6. Active Zone Minutes (10%) — 22 min/day recommended (CDC)
-    score_azm = min((active_zone_minutes / 22) * 100, 100)
-
-    # 7. Total Calories (5%) — 2000–3500 range is healthy/active
-    if total_calories >= 2500:
-        score_cal = 100
-    elif total_calories >= 2000:
-        score_cal = 80
-    elif total_calories >= 1500:
-        score_cal = 50
-    else:
-        score_cal = 30 if total_calories > 0 else 0
-
-    # ── Weighted energy score ────────────────────────────────────
-    energy_score = round(
-        score_sleep_eff * 0.25 +
-        score_sleep_dur * 0.20 +
-        score_deep * 0.10 +
-        score_steps * 0.15 +
-        score_rhr * 0.15 +
-        score_azm * 0.10 +
-        score_cal * 0.05
+    # ── Weighted energy score (0–10) ──
+    energy_raw = (
+        sleep_score * 0.60 +
+        hr_score    * 0.25 +
+        spo2_score  * 0.15
     )
+    energy_raw = round(min(max(energy_raw, 0), 10), 1)
 
-    # ── Determine energy level and forecast message ──────────────
-    if energy_score >= 75:
+    # Scale to 0–100 for the UI
+    energy_score = round(energy_raw * 10)
+
+    # ── Energy label ──
+    if energy_raw >= 8.5:
         energy_level = "high"
-        forecast = "Good energy expected tomorrow"
-    elif energy_score >= 45:
+        forecast = "Very high energy expected tomorrow ⚡⚡"
+    elif energy_raw >= 7:
+        energy_level = "high"
+        forecast = "Good energy expected tomorrow ⚡"
+    elif energy_raw >= 5.5:
         energy_level = "average"
-        forecast = "Average energy expected tomorrow"
-    else:
+        forecast = "Moderate energy expected tomorrow"
+    elif energy_raw >= 4:
         energy_level = "low"
         forecast = "Low energy expected tomorrow"
-
-    # ── Smart nudge: identify the weakest factor ─────────────────
-    factor_scores = {
-        "sleep quality": score_sleep_eff,
-        "sleep duration": score_sleep_dur,
-        "deep sleep": score_deep,
-        "activity (steps)": score_steps,
-        "resting heart rate": score_rhr,
-        "active zone minutes": score_azm,
-    }
-    weakest_factor = min(factor_scores, key=factor_scores.get)
-    weakest_score = factor_scores[weakest_factor]
-
-    nudge_map = {
-        "sleep quality": "Try to reduce screen time before bed for deeper sleep",
-        "sleep duration": f"You slept {sleep_hours}h — aim for 7–8 hours tonight",
-        "deep sleep": "Light exercise during the day can boost deep sleep",
-        "activity (steps)": f"Only {steps:,} steps today — a short walk can help",
-        "resting heart rate": f"RHR is {resting_bpm} bpm — try relaxation or breathing exercises",
-        "active zone minutes": "Try to include some moderate-intensity activity today",
-    }
-
-    if energy_level == "high":
-        nudge = "You're doing everything right — keep it up! 💪"
-    elif weakest_score < 40:
-        nudge = nudge_map.get(weakest_factor, "Focus on sleep and moderate activity")
     else:
-        nudge = "Aim for 7–8 hours sleep and moderate activity"
+        energy_level = "low"
+        forecast = "Very low energy expected tomorrow"
+
+    # ── Smart nudge ──
+    tips = []
+    if hours_asleep < 7:
+        tips.append(f"You slept {hours_asleep:.1f}h — aim for 7–8 hours tonight")
+    if current_hr > 80:
+        tips.append(f"Heart rate is {current_hr} bpm — try relaxation or breathing exercises")
+    if spo2 and spo2 < 95:
+        tips.append(f"SpO2 is {spo2}% — ensure good ventilation while sleeping")
+    if energy_raw >= 7:
+        tips.append("You're set for a good day tomorrow! 🎯")
+
+    nudge = tips[0] if tips else "Aim for 7–8 hours sleep and stay active"
 
     return {
-        "date": today_str,
+        "date": used_date,
         "forecast": forecast,
         "nudge": nudge,
         "energy_level": energy_level,
         "energy_score": energy_score,
         "factors": {
-            "sleep_efficiency": {"value": sleep_efficiency, "unit": "%", "score": score_sleep_eff},
-            "sleep_duration": {"value": sleep_hours, "unit": "hrs", "score": score_sleep_dur},
-            "deep_sleep": {"value": deep_sleep_pct, "unit": "%", "score": score_deep},
-            "steps": {"value": steps, "unit": "steps", "score": score_steps},
-            "resting_hr": {"value": resting_bpm, "unit": "bpm", "score": score_rhr},
-            "active_zone_min": {"value": active_zone_minutes, "unit": "min", "score": score_azm},
-            "calories": {"value": round(total_calories), "unit": "kcal", "score": score_cal},
+            "sleep_duration": {"value": round(hours_asleep, 1), "unit": "hrs", "score": round(sleep_score * 10)},
+            "resting_hr": {"value": current_hr, "unit": "bpm", "score": round(hr_score * 10)},
+            "spo2": {"value": spo2, "unit": "%", "score": round(spo2_score * 10)},
+            "steps": {"value": steps, "unit": "steps", "score": 0},
+            "deep_sleep": {"value": 0, "unit": "%", "score": 0},
+            "sleep_efficiency": {"value": round(sleep_score * 10), "unit": "%", "score": round(sleep_score * 10)},
+            "active_zone_min": {"value": 0, "unit": "min", "score": 0},
+            "calories": {"value": 0, "unit": "kcal", "score": 0},
         }
     }
+
 
 # Feature 2: Sleep Consistency Streaks & Nudges
 def calculate_sleep_streaks_and_nudges(full_data):
     """
-    Input: full Fitbit JSON dict
+    Input: Google Fit JSON dict (days-based)
     Consistency = bedtime ±90 min of average AND ≥7 hours sleep
     Returns: streak & nudge info
     """
-    sleep_daily = full_data.get("sleep", {}).get("daily_sleep", {})
-    if not sleep_daily:
+    days = full_data.get("days", {})
+    if not days:
         return {"current_streak": 0, "max_streak": 0, "nudge": "No sleep data available"}
 
     sleep_list = []
@@ -203,25 +197,26 @@ def calculate_sleep_streaks_and_nudges(full_data):
     total_sleep_minutes = 0
     valid_count = 0
 
-    for date_str, sleep_entry in sleep_daily.items():
-        if not sleep_entry.get("is_main_sleep", False):
+    for date_str in sorted(days.keys()):
+        day = days[date_str]
+        sleep_obj = day.get("sleep")
+        if not sleep_obj:
             continue
-        start_time = sleep_entry.get("start_time")
-        minutes_asleep = sleep_entry.get("minutes_asleep", 0)
+
+        minutes_asleep = sleep_obj.get("minutes_asleep", 0) or 0
+        start_time = sleep_obj.get("start_time")  # "HH:MM" format in Google Fit JSON
         if not start_time or minutes_asleep == 0:
             continue
 
         try:
-            bedtime_str = start_time[11:16]  # HH:MM
-            hour, minute = map(int, bedtime_str.split(":"))
+            hour, minute = map(int, start_time.split(":"))
             bedtime_minutes = hour * 60 + minute
 
             sleep_list.append({
                 "date": date_str,
                 "bedtime_minutes": bedtime_minutes,
-                "bedtime": bedtime_str,
+                "bedtime": start_time,
                 "minutes_asleep": minutes_asleep,
-                "efficiency_percent": sleep_entry.get("efficiency_percent", 0)
             })
 
             total_bedtime_minutes += bedtime_minutes
@@ -264,14 +259,14 @@ def calculate_sleep_streaks_and_nudges(full_data):
         else:
             current_streak = 0
 
-        # Late night: after 1:30 AM (hour >= 25 or hour <= 2)
+        # Late night: after 1:30 AM
         hour = bedtime_min // 60
         if hour <= 2:
             late_nights += 1
         else:
             late_nights = 0
 
-    # Nudge logic – encouraging, but honest about sleep duration
+    # Nudge logic
     nudge = ""
     if current_streak >= 3:
         nudge = f"Excellent! {current_streak}-day streak of consistent bedtime + ≥7 hours sleep. You're crushing it!"
@@ -283,7 +278,7 @@ def calculate_sleep_streaks_and_nudges(full_data):
         nudge = "Several late nights recently — earlier bedtime + aiming for 7+ hours could make a big difference."
     else:
         nudge = f"Your average bedtime is ~{avg_bedtime_str} with ~{avg_sleep_hours:.1f} hours sleep — fairly stable. Keep pushing for 7+ hours consistently."
-   
+
     return {
         "current_streak": current_streak,
         "max_streak": max_streak,
@@ -293,27 +288,29 @@ def calculate_sleep_streaks_and_nudges(full_data):
         "nudge": nudge
     }
 
+
 # Feature 3: Personalized Nudge Engine
 def generate_personalized_nudges(full_data):
     """
-    Input: full Fitbit JSON dict
-    Extracts only: yesterday's sleep efficiency, steps, resting BPM
+    Input: Google Fit JSON dict (days-based)
+    Extracts: yesterday's sleep, steps, resting BPM
     Returns: list of nudge strings
     """
+    days = full_data.get("days", {})
     today = datetime.now().date()
     yesterday_str = (today - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    yesterday_sleep = full_data.get("sleep", {}).get("daily_sleep", {}).get(yesterday_str, {})
-    yesterday_steps = full_data.get("steps", {}).get(yesterday_str, 0)
-    yesterday_hr = full_data.get("heart_rate", {}).get("daily_summaries", {}).get(yesterday_str, {})
-
-    sleep_efficiency = yesterday_sleep.get("efficiency_percent", 0)
-    steps = yesterday_steps
-    resting_bpm = yesterday_hr.get("resting_bpm", 70)
+    yesterday = days.get(yesterday_str, {})
+    steps = yesterday.get("steps", 0)
+    resting_bpm = yesterday.get("resting_bpm") or yesterday.get("avg_bpm") or 70
+    sleep_obj = yesterday.get("sleep") or {}
+    hours_asleep = sleep_obj.get("hours_asleep", 0)
 
     nudges = []
 
-    readiness_proxy = sleep_efficiency * 0.6 + (steps / 100) * 0.4
+    # Simple readiness proxy from sleep + steps
+    sleep_score = min(hours_asleep / 8 * 100, 100)
+    readiness_proxy = sleep_score * 0.6 + (steps / 100) * 0.4
     readiness_proxy = min(100, max(0, readiness_proxy))
 
     stress_proxy = resting_bpm
@@ -322,7 +319,7 @@ def generate_personalized_nudges(full_data):
     if readiness_proxy < 40:
         nudges.append("Low readiness today — recommend light activity or rest")
 
-    if stress_level == "high" and sleep_efficiency < 80:
+    if stress_level == "high" and hours_asleep < 7:
         nudges.append("High stress + poor sleep detected → try 10 min breathing exercise")
 
     if steps < 6000:
@@ -337,7 +334,7 @@ def generate_personalized_nudges(full_data):
 # Feature 4: Step Consistency & Nudges
 def calculate_step_consistency(full_data):
     """
-    Input: full Fitbit JSON dict
+    Input: Google Fit JSON dict (days-based)
     Calculates:
       - Average daily steps over all available days
       - Current streak of days meeting step goal (10000 steps)
@@ -346,9 +343,9 @@ def calculate_step_consistency(full_data):
       - 1–3 step-based nudges
     Returns: dict with stats and nudge list
     """
-    steps_data = full_data.get("steps", {})
+    days = full_data.get("days", {})
 
-    if not steps_data or isinstance(steps_data, dict) and "error" in steps_data:
+    if not days:
         return {
             "average_steps": 0,
             "total_days": 0,
@@ -365,7 +362,8 @@ def calculate_step_consistency(full_data):
 
     # Build sorted list of (date, steps)
     day_list = []
-    for date_str, step_count in steps_data.items():
+    for date_str, day_data in days.items():
+        step_count = day_data.get("steps", 0) or 0
         if isinstance(step_count, (int, float)):
             day_list.append({"date": date_str, "steps": int(step_count)})
 
@@ -396,7 +394,7 @@ def calculate_step_consistency(full_data):
     # Days at goal
     days_at_goal = sum(1 for d in day_list if d["steps"] >= STEP_GOAL)
 
-    # Streak calculation (from most recent backwards for current, full scan for best)
+    # Streak calculation
     current_streak = 0
     for d in reversed(day_list):
         if d["steps"] >= STEP_GOAL:
@@ -449,29 +447,28 @@ def calculate_step_consistency(full_data):
 
 # Main execution: Load JSON once, then call functions
 if __name__ == "__main__":
-    # Load your JSON file (change path if needed)
-    with open("fitbit_2weeks_data.json", "r") as f:
+    with open("googlefit_2weeks_data.json", "r") as f:
         full_data = json.load(f)
 
     print("=== Body Battery Forecast ===")
     forecast = forecast_body_battery(full_data)
-    # print(json.dumps(forecast, indent=2))
-    print("----------")
     print(forecast)
-    print("forecast: ",forecast["forecast"])
-    print("suggestion: ",forecast["nudge"])
+    print("forecast: ", forecast["forecast"])
+    print("suggestion: ", forecast["nudge"])
     print("----------")
 
     print("\n=== Sleep Consistency Streaks & Nudges ===")
     streaks = calculate_sleep_streaks_and_nudges(full_data)
-    # print(json.dumps(streaks, indent=2))
-    print("----------")
     print(streaks)
-    print("current streak: ",streaks["current_streak"])
-    print("suggestion: ",streaks["nudge"])
+    print("current streak: ", streaks["current_streak"])
+    print("suggestion: ", streaks["nudge"])
     print("----------")
 
     print("\n=== Personalized Nudges ===")
     nudges = generate_personalized_nudges(full_data)
     for n in nudges:
         print("•", n)
+
+    print("\n=== Step Consistency ===")
+    step_data = calculate_step_consistency(full_data)
+    print(step_data)

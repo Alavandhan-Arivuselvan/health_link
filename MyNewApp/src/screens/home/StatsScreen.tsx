@@ -8,7 +8,7 @@
  *
  * Backend endpoints used:
  *   GET  /api/fitbit-insights  → all 3 insights + last_sync
- *   POST /api/fitbit-refresh   → re-fetch from Fitbit API
+ *   POST /api/fitbit-refresh   → re-fetch from Google Fit API
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -62,6 +62,7 @@ interface EnergyForecast {
     deep_sleep: FactorDetail;
     steps: FactorDetail;
     resting_hr: FactorDetail;
+    spo2: FactorDetail;
     active_zone_min: FactorDetail;
     calories: FactorDetail;
   };
@@ -212,7 +213,7 @@ const StatsScreen = () => {
       // Now fetch the updated insights
       await fetchInsights();
     } catch (e: any) {
-      setError(e.message || 'Failed to sync with Fitbit');
+      setError(e.message || 'Failed to sync with Google Fit');
     } finally {
       setSyncing(false);
     }
@@ -286,9 +287,9 @@ const StatsScreen = () => {
             </View>
           </View>
 
-          <Text style={styles.connectTitle}>Connect Your Fitbit</Text>
+          <Text style={styles.connectTitle}>Connect Google Fit</Text>
           <Text style={styles.connectSubtitle}>
-            Sync your Fitbit data to get personalized energy forecasts, sleep insights, and daily wellness nudges.
+            Sync your Google Fit data to get personalized energy forecasts, sleep insights, and daily wellness nudges.
           </Text>
 
           {/* Feature pills */}
@@ -315,7 +316,7 @@ const StatsScreen = () => {
               ) : (
                 <>
                   <Ionicons name="sync" size={20} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.connectButtonText}>Sync Fitbit Data</Text>
+                  <Text style={styles.connectButtonText}>Sync Google Fit Data</Text>
                 </>
               )}
             </View>
@@ -388,18 +389,18 @@ const StatsScreen = () => {
 
             <View style={styles.statPillRow}>
               <StatPill
-                label="Steps"
-                value={energyForecast.factors.steps.value.toLocaleString()}
-                color={COLORS.teal}
+                label="Sleep"
+                value={`${energyForecast.factors.sleep_duration.value}h`}
+                color={COLORS.purple}
               />
               <StatPill
-                label="RHR"
+                label="Heart Rate"
                 value={`${energyForecast.factors.resting_hr.value} bpm`}
                 color={COLORS.red}
               />
               <StatPill
-                label="Active Min"
-                value={`${energyForecast.factors.active_zone_min.value}`}
+                label="SpO2"
+                value={`${energyForecast.factors.spo2?.value ?? '—'}%`}
                 color={COLORS.teal}
               />
             </View>

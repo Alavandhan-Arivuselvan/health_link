@@ -22,6 +22,8 @@ import datetime
 _BACKEND_DIR    = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT   = os.path.dirname(_BACKEND_DIR)           # health_link/
 _GRAPH_SCHEMA   = os.path.join(_PROJECT_ROOT, "KG", "Graph_Schema")
+if not os.path.exists(_GRAPH_SCHEMA):
+    _GRAPH_SCHEMA = os.path.join(_BACKEND_DIR, "KG", "Graph_Schema")
 
 if _GRAPH_SCHEMA not in sys.path:
     sys.path.insert(0, _GRAPH_SCHEMA)
@@ -124,7 +126,7 @@ def get_graph_data() -> dict:
             # Fetch all nodes
             nodes_result = session.run("""
                 MATCH (n)
-                RETURN id(n) AS id, labels(n) AS labels, properties(n) AS props
+                RETURN elementId(n) AS id, labels(n) AS labels, properties(n) AS props
             """)
             nodes = []
             for r in nodes_result:
@@ -149,7 +151,7 @@ def get_graph_data() -> dict:
             # Fetch all relationships
             rels_result = session.run("""
                 MATCH (a)-[r]->(b)
-                RETURN id(a) AS source, id(b) AS target, type(r) AS type
+                RETURN elementId(a) AS source, elementId(b) AS target, type(r) AS type
             """)
             edges = []
             for r in rels_result:

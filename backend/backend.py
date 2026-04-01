@@ -426,26 +426,61 @@ async def upload_report(
         "message": "Report uploaded. Processing in background.",
     }
 
-health_records = {
-    "past": [
-        {'Date': '2026-02-05', 'Age': 19, 'Sleep Duration': 7.8, 'Quality of Sleep': 8.0, 'Heart Rate': 72, 'Daily Steps': 11452},
-        {'Date': '2026-02-06', 'Age': 19, 'Sleep Duration': 8.2, 'Quality of Sleep': 8.5, 'Heart Rate': 70, 'Daily Steps': 12123},
-        {'Date': '2026-02-07', 'Age': 19, 'Sleep Duration': 7.5, 'Quality of Sleep': 7.5, 'Heart Rate': 75, 'Daily Steps': 10895},
-        {'Date': '2026-02-08', 'Age': 19, 'Sleep Duration': 8.0, 'Quality of Sleep': 8.0, 'Heart Rate': 71, 'Daily Steps': 13000},
-        {'Date': '2026-02-09', 'Age': 19, 'Sleep Duration': 7.9, 'Quality of Sleep': 8.2, 'Heart Rate': 73, 'Daily Steps': 11562},
-        {'Date': '2026-02-10', 'Age': 19, 'Sleep Duration': 8.4, 'Quality of Sleep': 9.0, 'Heart Rate': 70, 'Daily Steps': 14223},
-        {'Date': '2026-02-11', 'Age': 19, 'Sleep Duration': 7.7, 'Quality of Sleep': 7.8, 'Heart Rate': 74, 'Daily Steps': 10705}, 
-    ],
-    "current": [
-        {'Date': '2026-02-12', 'Age': 19, 'Sleep Duration': 4.2, 'Quality of Sleep': 3.0, 'Heart Rate': 88, 'Daily Steps': 1202},
-        {'Date': '2026-02-13', 'Age': 19, 'Sleep Duration': 3.5, 'Quality of Sleep': 2.5, 'Heart Rate': 90, 'Daily Steps': 853},
-        {'Date': '2026-02-14', 'Age': 19, 'Sleep Duration': 10.5, 'Quality of Sleep': 4.0, 'Heart Rate': 85, 'Daily Steps': 1505},
-        {'Date': '2026-02-15', 'Age': 19, 'Sleep Duration': 4.0, 'Quality of Sleep': 2.0, 'Heart Rate': 89, 'Daily Steps': 2130},
-        {'Date': '2026-02-16', 'Age': 19, 'Sleep Duration': 5.1, 'Quality of Sleep': 3.5, 'Heart Rate': 87, 'Daily Steps': 1102},
-        {'Date': '2026-02-17', 'Age': 19, 'Sleep Duration': 3.8, 'Quality of Sleep': 2.5, 'Heart Rate': 90, 'Daily Steps': 943},
-        {'Date': '2026-02-18', 'Age': 19, 'Sleep Duration': 9.8, 'Quality of Sleep': 4.5, 'Heart Rate': 84, 'Daily Steps': 1305}
-    ]
-}
+# ──────────────────────────────────────────────────────────
+# GOOGLE FIT DATA HELPERS (replaces old hardcoded health_records)
+# ──────────────────────────────────────────────────────────
+
+def _load_googlefit_records(user_age: int = 19):
+    """
+    Load googlefit_2weeks_data.json and convert to the list-of-dicts
+    format expected by calculate_weekly_risk:
+       [{Date, Age, Sleep Duration, Quality of Sleep, Heart Rate, Daily Steps}, ...]
+    Returns the full sorted list (14 days) or empty list on failure.
+    """
+    gfit_path = os.path.join(ML_DIR, "googlefit_2weeks_data.json")
+    if not os.path.exists(gfit_path):
+        print("⚠️ googlefit_2weeks_data.json not found")
+        return []
+    try:
+        with open(gfit_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"⚠️ Failed to read Google Fit data: {e}")
+        return []
+
+    days = data.get("days", {})
+    records = []
+    for date_str in sorted(days.keys()):
+        day = days[date_str]
+        steps = day.get("steps") or 0
+        resting_bpm = day.get("resting_bpm") or day.get("avg_bpm") or 70
+        sleep_obj = day.get("sleep") or {}
+        hours_asleep = sleep_obj.get("hours_asleep") or 0.0
+
+        # Derive sleep quality on a 1-10 scale from hours
+        if hours_asleep >= 8:
+            sleep_quality = 9.0
+        elif hours_asleep >= 7:
+            sleep_quality = 8.0
+        elif hours_asleep >= 6:
+            sleep_quality = 7.0
+        elif hours_asleep >= 5:
+            sleep_quality = 6.0
+        elif hours_asleep > 0:
+            sleep_quality = 5.0
+        else:
+            sleep_quality = 0.0
+
+        records.append({
+            'Date': date_str,
+            'Age': user_age,
+            'Sleep Duration': round(hours_asleep, 1),
+            'Quality of Sleep': sleep_quality,
+            'Heart Rate': round(float(resting_bpm), 1),
+            'Daily Steps': int(steps),
+        })
+    return records
+
 
 def calculate_weekly_risk(week_data):
     df = pd.DataFrame(week_data)
@@ -544,9 +579,17 @@ def get_graph():
 
 @app.get("/api/health-stats/{week_type}")
 async def get_stats(week_type: str):
-    data = health_records.get(week_type, [])
+    all_records = _load_googlefit_records()
+    if not all_records:
+        raise HTTPException(status_code=404, detail="Google Fit data not found. Sync first.")
+    # Split 14 days: first 7 = past, last 7 = current
+    mid = len(all_records) // 2
+    if week_type == "past":
+        data = all_records[:mid]
+    else:
+        data = all_records[mid:]
     risk_analysis = calculate_weekly_risk(data)
-    print("called")
+    print(f"health-stats/{week_type} called — {len(data)} days")
     return {
         "raw_data": data,
         "analysis": risk_analysis
@@ -716,26 +759,26 @@ except ImportError as _mle:
     def generate_personalized_nudges(*args, **kwargs): return []
     def calculate_step_consistency(*args, **kwargs): return {}
 
-FITBIT_JSON_PATH = os.path.join(ML_DIR, "fitbit_2weeks_data.json")
+GOOGLEFIT_JSON_PATH = os.path.join(ML_DIR, "googlefit_2weeks_data.json")
 
 
 @app.get("/api/fitbit-insights")
 def get_fitbit_insights():
     """
-    Read the Fitbit JSON data file and compute all 4 wellness insights:
+    Read the Google Fit JSON data file and compute all 4 wellness insights:
       1. Body Battery Energy Forecast
       2. Sleep Consistency Streaks & Nudges
       3. Personalized Nudges
       4. Step Consistency & Nudges
     """
-    if not os.path.exists(FITBIT_JSON_PATH):
-        raise HTTPException(status_code=404, detail="Fitbit data not found. Run data fetch first.")
+    if not os.path.exists(GOOGLEFIT_JSON_PATH):
+        raise HTTPException(status_code=404, detail="Google Fit data not found. Run data fetch first.")
 
     try:
-        with open(FITBIT_JSON_PATH, "r", encoding="utf-8") as f:
+        with open(GOOGLEFIT_JSON_PATH, "r", encoding="utf-8") as f:
             full_data = json.load(f)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read Fitbit data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to read Google Fit data: {str(e)}")
 
     # Run all 4 insight functions from wear.py
     energy_forecast = forecast_body_battery(full_data)
@@ -744,7 +787,7 @@ def get_fitbit_insights():
     step_consistency = calculate_step_consistency(full_data)
 
     # Get file modification time as "last sync"
-    mod_time = os.path.getmtime(FITBIT_JSON_PATH)
+    mod_time = os.path.getmtime(GOOGLEFIT_JSON_PATH)
     last_sync = dt.datetime.fromtimestamp(mod_time).isoformat()
     print(energy_forecast)
     print(sleep_consistency)
@@ -759,27 +802,31 @@ def get_fitbit_insights():
     }
 
 
-@app.post("/api/fitbit-refresh")#hi
+@app.post("/api/fitbit-refresh")
 def refresh_fitbit_data():
     """
-    Re-run final_fetch.py to pull fresh data from Fitbit API
-    and overwrite fitbit_2weeks_data.json.
+    Re-run google_fit_v2.py to pull fresh data from Google Fit API
+    and overwrite googlefit_2weeks_data.json.
     """
-    fetch_script = os.path.join(ML_DIR, "final_fetch.py")
+    fetch_script = os.path.join(ML_DIR, "google_fit_v2.py")
     if not os.path.exists(fetch_script):
-        raise HTTPException(status_code=404, detail="Fetch script not found")
+        raise HTTPException(status_code=404, detail="Google Fit fetch script not found")
 
     try:
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
         result = subprocess.run(
             [sys.executable, fetch_script],
             cwd=ML_DIR,
             capture_output=True,
             text=True,
             timeout=60,
+            encoding="utf-8",
+            env=env,
         )
         if result.returncode != 0:
             raise HTTPException(status_code=500, detail=f"Fetch failed: {result.stderr}")
-        return {"status": "success", "message": "Fitbit data refreshed"}
+        return {"status": "success", "message": "Google Fit data refreshed"}
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=504, detail="Fetch timed out")
     except Exception as e:

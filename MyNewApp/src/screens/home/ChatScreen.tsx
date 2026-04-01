@@ -60,7 +60,7 @@ const ChatScreen = () => {
                     contentContainerStyle={styles.listContent}
                 />
 
-                {/* Input bar */}
+                {/* Input bar — positioned above the floating tab bar */}
                 <View style={styles.inputContainer}>
                     <TextInput
                         style={styles.input}
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         padding: theme.spacing.m,
-        paddingBottom: 24,
+        paddingBottom: 90,
         backgroundColor: theme.colors.bgCard,
         alignItems: 'center',
     },

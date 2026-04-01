@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   },
   refreshBtn: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 100,
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',
