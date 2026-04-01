@@ -15,7 +15,6 @@ import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import GradientBackground from '../../components/GradientBackground';
 import { theme } from '../../theme';
 import { reportsAPI } from '../../services/api';
@@ -255,14 +254,10 @@ const ReportHistoryScreen = ({ navigation }: any) => {
                 </ScrollView>
             )}
 
-            {/* Bottom upload button */}
             <View style={styles.bottomBar}>
                 <TouchableOpacity activeOpacity={0.85} style={styles.uploadBtn} onPress={handleUpload} disabled={uploading}>
-                    <LinearGradient
-                        colors={uploading ? ['#3A4A5A', '#3A4A5A'] : [theme.colors.accent, theme.colors.accentDark]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.uploadGradient}
+                    <View
+                        style={[styles.uploadGradient, uploading && { backgroundColor: '#3A4A5A' }]}
                     >
                         {uploading ? (
                             <ActivityIndicator color={theme.colors.text} />
@@ -272,7 +267,7 @@ const ReportHistoryScreen = ({ navigation }: any) => {
                                 <Text style={styles.uploadText}>Upload New Report</Text>
                             </>
                         )}
-                    </LinearGradient>
+                    </View>
                 </TouchableOpacity>
             </View>
         </GradientBackground>
@@ -284,13 +279,11 @@ const styles = StyleSheet.create({
 
     header: {
         flexDirection: 'row', alignItems: 'center',
-        paddingTop: 54, paddingHorizontal: 16, paddingBottom: 14,
-        borderBottomWidth: 1, borderBottomColor: theme.colors.border,
+        paddingTop: 48, paddingHorizontal: 16, paddingBottom: 10,
     },
     backBtn: {
         width: 40, height: 40, borderRadius: 20,
-        backgroundColor: theme.colors.glassLight, justifyContent: 'center', alignItems: 'center',
-        borderWidth: 1, borderColor: theme.colors.border,
+        backgroundColor: theme.colors.bgCard, justifyContent: 'center', alignItems: 'center',
     },
     headerTitle: {
         flex: 1, textAlign: 'center',
@@ -298,16 +291,14 @@ const styles = StyleSheet.create({
     } as any,
     searchBtn: {
         width: 40, height: 40, borderRadius: 20,
-        backgroundColor: theme.colors.glassLight, justifyContent: 'center', alignItems: 'center',
-        borderWidth: 1, borderColor: theme.colors.border,
+        backgroundColor: theme.colors.bgCard, justifyContent: 'center', alignItems: 'center',
     },
 
     summaryBar: {
         flexDirection: 'row', alignItems: 'center',
         backgroundColor: theme.colors.bgCard,
         marginHorizontal: 16, marginTop: 16,
-        borderRadius: 16, padding: 16,
-        borderWidth: 1, borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.m, padding: 16,
     },
     summaryItem: { flex: 1, alignItems: 'center' },
     summaryValue: { fontSize: 22, fontWeight: '800', color: theme.colors.text } as any,
@@ -326,8 +317,8 @@ const styles = StyleSheet.create({
     reportCard: {
         flexDirection: 'row', alignItems: 'center',
         backgroundColor: theme.colors.bgCard,
-        borderRadius: 18, padding: 16, marginBottom: 10,
-        borderWidth: 1, borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.m, padding: 16, marginBottom: 10,
+        ...theme.shadow.card,
     },
     reportIcon: {
         width: 48, height: 48, borderRadius: 14,
@@ -353,10 +344,11 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.bgDark,
         borderTopWidth: 1, borderTopColor: theme.colors.border,
     },
-    uploadBtn: { borderRadius: 16, overflow: 'hidden', ...theme.shadow.glow },
+    uploadBtn: { borderRadius: 999, overflow: 'hidden' },
     uploadGradient: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-        height: 54, borderRadius: 16, gap: 10,
+        height: 54, borderRadius: 999, gap: 10,
+        backgroundColor: theme.colors.accent,
     },
     uploadText: {
         fontSize: 17, fontWeight: '700', color: theme.colors.bgDark, letterSpacing: 0.3,

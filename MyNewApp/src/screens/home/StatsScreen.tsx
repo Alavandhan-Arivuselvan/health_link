@@ -8,7 +8,7 @@
  *
  * Backend endpoints used:
  *   GET  /api/fitbit-insights  → all 3 insights + last_sync
- *   POST /api/fitbit-refresh   → re-fetch from Fitbit API
+ *   POST /api/fitbit-refresh   → re-fetch from Google Fit API
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -22,15 +22,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import GradientBackground from '../../components/GradientBackground';
 import { theme } from '../../theme';
 import { BASE_URL } from '../../config/host';
 
 // ─── Color palette for wellness cards ───────────────────────────
 const COLORS = {
-  teal: '#0ea5e9',
-  tealLight: 'rgba(14, 165, 233, 0.15)',
+  teal: '#00C9A7',
+  tealLight: 'rgba(0, 201, 167, 0.12)',
   purple: '#8b5cf6',
   purpleLight: 'rgba(139, 92, 246, 0.15)',
   amber: '#f59e0b',
@@ -39,20 +38,34 @@ const COLORS = {
   greenLight: 'rgba(34, 197, 94, 0.15)',
   red: '#ef4444',
   redLight: 'rgba(239, 68, 68, 0.15)',
-  cardBg: 'rgba(26, 35, 50, 0.9)',
-  cardBorder: 'rgba(255, 255, 255, 0.08)',
+  cardBg: '#161B22',
+  cardBorder: 'rgba(48, 54, 61, 0.4)',
 };
 
 // ─── Types matching backend response ────────────────────────────
+
+interface FactorDetail {
+  value: number;
+  unit: string;
+  score: number;
+}
 
 interface EnergyForecast {
   date: string;
   forecast: string;
   nudge: string;
   energy_level: 'low' | 'high' | 'average';
-  sleep_efficiency_used: number;
-  active_minutes_proxy: number;
-  resting_bpm: number;
+  energy_score: number;
+  factors: {
+    sleep_efficiency: FactorDetail;
+    sleep_duration: FactorDetail;
+    deep_sleep: FactorDetail;
+    steps: FactorDetail;
+    resting_hr: FactorDetail;
+    spo2: FactorDetail;
+    active_zone_min: FactorDetail;
+    calories: FactorDetail;
+  };
 }
 
 interface SleepConsistency {
@@ -64,12 +77,25 @@ interface SleepConsistency {
   nudge: string;
 }
 
+interface StepConsistency {
+  average_steps: number;
+  total_days: number;
+  current_streak: number;
+  best_streak: number;
+  best_day: { date: string; steps: number };
+  worst_day: { date: string; steps: number };
+  days_at_goal: number;
+  goal: number;
+  nudges: string[];
+}
+
 interface InsightsResponse {
   status: string;
   last_sync: string;
   energy_forecast: EnergyForecast;
   sleep_consistency: SleepConsistency;
   nudges: string[];
+  step_consistency: StepConsistency;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -136,6 +162,7 @@ const StatsScreen = () => {
   const [energyForecast, setEnergyForecast] = useState<EnergyForecast | null>(null);
   const [sleepConsistency, setSleepConsistency] = useState<SleepConsistency | null>(null);
   const [nudges, setNudges] = useState<string[]>([]);
+  const [stepConsistency, setStepConsistency] = useState<StepConsistency | null>(null);
 
   // ── Fetch insights from backend ───────────────────────────────
   const fetchInsights = useCallback(async () => {
@@ -157,6 +184,7 @@ const StatsScreen = () => {
       setEnergyForecast(data.energy_forecast);
       setSleepConsistency(data.sleep_consistency);
       setNudges(data.nudges);
+      setStepConsistency(data.step_consistency);
       setLastSync(data.last_sync);
       setHasData(true);
     } catch (e: any) {
@@ -185,7 +213,7 @@ const StatsScreen = () => {
       // Now fetch the updated insights
       await fetchInsights();
     } catch (e: any) {
-      setError(e.message || 'Failed to sync with Fitbit');
+      setError(e.message || 'Failed to sync with Google Fit');
     } finally {
       setSyncing(false);
     }
@@ -252,17 +280,16 @@ const StatsScreen = () => {
         <ScrollView contentContainerStyle={styles.centeredContent} showsVerticalScrollIndicator={false}>
           {/* Decorative icon */}
           <View style={styles.connectIconWrapper}>
-            <LinearGradient
-              colors={[COLORS.tealLight, COLORS.purpleLight]}
+            <View
               style={styles.connectIconGradient}
             >
               <MaterialCommunityIcons name="watch" size={48} color={COLORS.teal} />
-            </LinearGradient>
+            </View>
           </View>
 
-          <Text style={styles.connectTitle}>Connect Your Fitbit</Text>
+          <Text style={styles.connectTitle}>Connect Google Fit</Text>
           <Text style={styles.connectSubtitle}>
-            Sync your Fitbit data to get personalized energy forecasts, sleep insights, and daily wellness nudges.
+            Sync your Google Fit data to get personalized energy forecasts, sleep insights, and daily wellness nudges.
           </Text>
 
           {/* Feature pills */}
@@ -281,10 +308,7 @@ const StatsScreen = () => {
 
           {/* Sync button — triggers backend to fetch from Fitbit API */}
           <TouchableOpacity onPress={handleRefreshFromFitbit} activeOpacity={0.85} disabled={syncing}>
-            <LinearGradient
-              colors={['#0ea5e9', '#8b5cf6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+            <View
               style={styles.connectButton}
             >
               {syncing ? (
@@ -292,10 +316,10 @@ const StatsScreen = () => {
               ) : (
                 <>
                   <Ionicons name="sync" size={20} color="#fff" style={{ marginRight: 8 }} />
-                  <Text style={styles.connectButtonText}>Sync Fitbit Data</Text>
+                  <Text style={styles.connectButtonText}>Sync Google Fit Data</Text>
                 </>
               )}
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
@@ -358,26 +382,26 @@ const StatsScreen = () => {
               { backgroundColor: energyBg(energyForecast.energy_level) },
             ]}>
               <Text style={[styles.forecastLabel, { color: energyColor(energyForecast.energy_level) }]}>
-                {energyForecast.forecast}
+                {energyForecast.forecast}  •  {energyForecast.energy_score}/100
               </Text>
             </View>
             <Text style={styles.forecastNudge}>{energyForecast.nudge}</Text>
 
             <View style={styles.statPillRow}>
               <StatPill
-                label="Sleep Eff."
-                value={`${energyForecast.sleep_efficiency_used}%`}
+                label="Sleep"
+                value={`${energyForecast.factors.sleep_duration.value}h`}
                 color={COLORS.purple}
               />
               <StatPill
-                label="Active Min"
-                value={`${energyForecast.active_minutes_proxy}`}
-                color={COLORS.teal}
+                label="Heart Rate"
+                value={`${energyForecast.factors.resting_hr.value} bpm`}
+                color={COLORS.red}
               />
               <StatPill
-                label="RHR"
-                value={`${energyForecast.resting_bpm} bpm`}
-                color={COLORS.red}
+                label="SpO2"
+                value={`${energyForecast.factors.spo2?.value ?? '—'}%`}
+                color={COLORS.teal}
               />
             </View>
           </InsightCard>
@@ -433,18 +457,63 @@ const StatsScreen = () => {
           </InsightCard>
         )}
 
-        {/* ── Card 3: Personalized Nudges ── */}
-        {nudges.length > 0 && (
+        {/* ── Card 3: Step Consistency ── */}
+        {stepConsistency && (
           <InsightCard
-            icon="zap"
-            iconFamily="feather"
-            iconColor={COLORS.amber}
-            iconBg={COLORS.amberLight}
-            title="Your Nudges"
+            icon="footsteps"
+            iconFamily="ionicons"
+            iconColor={COLORS.teal}
+            iconBg={COLORS.tealLight}
+            title="Step Consistency"
           >
-            {nudges.map((nudge, i) => (
-              <View key={i} style={styles.nudgeRow}>
-                <Text style={styles.nudgeText}>• {nudge}</Text>
+            {/* Goal badge */}
+            <View style={[styles.forecastBadge, { backgroundColor: COLORS.tealLight, marginBottom: 14 }]}>
+              <Text style={[styles.forecastLabel, { color: COLORS.teal }]}>
+                🎯 Goal: {stepConsistency.goal.toLocaleString()} steps
+              </Text>
+            </View>
+
+            {/* Step stats row */}
+            <View style={styles.streakRow}>
+              <View style={styles.streakItem}>
+                <Text style={styles.streakNumber}>{stepConsistency.average_steps.toLocaleString()}</Text>
+                <Text style={styles.streakLabel}>Avg Steps</Text>
+              </View>
+              <View style={styles.streakDivider} />
+              <View style={styles.streakItem}>
+                <Text style={styles.streakNumber}>{stepConsistency.current_streak}</Text>
+                <Text style={styles.streakLabel}>Streak</Text>
+              </View>
+              <View style={styles.streakDivider} />
+              <View style={styles.streakItem}>
+                <Text style={styles.streakNumber}>{stepConsistency.best_streak}</Text>
+                <Text style={styles.streakLabel}>Best</Text>
+              </View>
+              <View style={styles.streakDivider} />
+              <View style={styles.streakItem}>
+                <Text style={styles.streakNumber}>{stepConsistency.days_at_goal}/{stepConsistency.total_days}</Text>
+                <Text style={styles.streakLabel}>Goal Days</Text>
+              </View>
+            </View>
+
+            {/* Best / Worst day pills */}
+            <View style={styles.statPillRow}>
+              <StatPill
+                label={`Best (${stepConsistency.best_day.date.slice(5)})`}
+                value={stepConsistency.best_day.steps.toLocaleString()}
+                color={COLORS.green}
+              />
+              <StatPill
+                label={`Low (${stepConsistency.worst_day.date.slice(5)})`}
+                value={stepConsistency.worst_day.steps.toLocaleString()}
+                color={COLORS.red}
+              />
+            </View>
+
+            {/* Step nudges */}
+            {stepConsistency.nudges.map((nudge, i) => (
+              <View key={i} style={[styles.nudgeRow, { marginTop: i === 0 ? 12 : 0 }]}>
+                <Text style={styles.nudgeText}>{nudge}</Text>
               </View>
             ))}
           </InsightCard>
@@ -539,17 +608,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     paddingHorizontal: 40,
-    borderRadius: 16,
+    borderRadius: 999,
     minWidth: 220,
     minHeight: 54,
-    shadowColor: '#0ea5e9',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    backgroundColor: COLORS.teal,
   },
   connectButtonText: {
-    color: '#fff',
+    color: '#0D1117',
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -613,11 +678,9 @@ const styles = StyleSheet.create({
   // ── Insight Card ──────────────────────────────────────────────
   insightCard: {
     backgroundColor: COLORS.cardBg,
-    borderRadius: 20,
+    borderRadius: theme.borderRadius.m,
     padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
   },
   insightHeader: {
     flexDirection: 'row',

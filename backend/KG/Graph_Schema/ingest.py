@@ -81,7 +81,7 @@ def ingest_medical_report(file_path: str, date: str):
     existing = graph_db.get_existing_canonicals()
     print(f"  Found: {len(existing['tests'])} tests, {len(existing['drugs'])} drugs, {len(existing['diagnoses'])} diagnoses")
 
-    print("\n-> Extracting with LLM...")
+    print("\n-> Extracting ...")
     extracted = extract_medical_report(text, existing, date)
 
     if not extracted:
@@ -159,7 +159,7 @@ def ingest_scan_report(file_path: str, date: str, modality: str = None, body_par
     print("\n-> Fetching existing canonicals...")
     existing = graph_db.get_existing_canonicals()
 
-    print("\n-> Extracting with LLM...")
+    print("\n-> Extracting ...")
     extracted = extract_scan_report(text, existing, date, modality, body_part)
 
     if not extracted:

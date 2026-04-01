@@ -7,7 +7,7 @@ import webbrowser
 import urllib.parse
 
 # === YOUR VALUES ===
-CLIENT_ID = "23V2GY"  # Your Client ID
+CLIENT_ID = "23V5R5"  # Your Client ID
 REDIRECT_URI = "http://127.0.0.1:8080/"  # Exact match from your app settings
 
 SCOPE = ["activity", "heartrate", "sleep", "profile"]

@@ -2,7 +2,7 @@ import requests
 import json
 from datetime import date
 
-ACCESS_TOKEN = ""  # From above
+ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIyM1Y1UjUiLCJzdWIiOiJEM1E5SEQiLCJpc3MiOiJGaXRiaXQiLCJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJzY29wZXMiOiJyYWN0IHJociBycHJvIHJzbGUiLCJleHAiOjE3NzQ5Nzk2ODAsImlhdCI6MTc3NDk3NTQzNX0.ppDcirayAmd3apAfYCa-r9gO8mNVZkFAtMOme-VuwfM"  # From above
 
 HEADERS = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
 BASE = "https://api.fitbit.com/1/user/-/"

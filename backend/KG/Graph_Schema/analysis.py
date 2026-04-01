@@ -249,13 +249,13 @@ def run_analysis_pass(anchor_date: str, days_back: int = 90):
           f"{len(subgraph['wearable'])} wearable points, "
           f"{len(subgraph['diagnoses'])} diagnoses")
 
-    print("\n  → Running LLM inference...")
+    print("\n  → Running ...")
     relationships = infer_relationships(subgraph)
 
     if not relationships:
         print("  No new relationships identified.")
         return
 
-    print(f"  LLM found {len(relationships)} potential relationships")
+    print(f"   found {len(relationships)} potential relationships")
     print("\n  → Writing to graph...")
     write_inferred_relationships(relationships, subgraph["window"])

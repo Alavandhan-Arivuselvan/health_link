@@ -1,7 +1,6 @@
 
 import React from 'react';
-import { StyleSheet, ViewStyle } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View, StyleSheet, ViewStyle } from 'react-native';
 
 interface Props {
     children: React.ReactNode;
@@ -10,18 +9,16 @@ interface Props {
 
 const GradientBackground: React.FC<Props> = ({ children, style }) => {
     return (
-        <LinearGradient
-            colors={['#0B1120', '#162033', '#1A2840']}
-            style={[styles.container, style]}
-        >
+        <View style={[styles.container, style]}>
             {children}
-        </LinearGradient>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: '#0D1117',
     },
 });
 

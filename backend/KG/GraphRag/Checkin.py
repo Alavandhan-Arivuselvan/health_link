@@ -21,7 +21,7 @@ from pathlib import Path
 from neo4j import GraphDatabase
 from google import genai
 
-from config import (
+from graphrag_config import (
     NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD,
     GEMINI_API_KEY, GEMINI_MODEL
 )

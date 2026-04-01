@@ -1,0 +1,343 @@
+{
+  "period": "2026-03-20 to 2026-04-02",
+  "fetched_at": "2026-04-02T01:07:28.344535",
+  "source": "Google Fit API",
+  "days": {
+    "2026-03-20": {
+      "date": "2026-03-20",
+      "steps": 5333,
+      "resting_bpm": 83.7,
+      "avg_bpm": 84.8,
+      "min_bpm": 82.1,
+      "max_bpm": 88.1,
+      "spo2_avg": 97.2,
+      "spo2_min": 96.0,
+      "spo2_max": 98.0,
+      "sleep": {
+        "hours_asleep": 6.8,
+        "minutes_asleep": 408,
+        "start_time": "22:37",
+        "end_time": "06:02",
+        "stages": {
+          "deep": 49,
+          "rem": 79,
+          "light": 204,
+          "wake": 10
+        },
+        "_fake": true
+      },
+      "_hr_fake": true,
+      "_spo2_fake": true
+    },
+    "2026-03-21": {
+      "date": "2026-03-21",
+      "steps": 12589,
+      "resting_bpm": 81.2,
+      "avg_bpm": 83.5,
+      "min_bpm": 79.6,
+      "max_bpm": 90.7,
+      "spo2_avg": 96.7,
+      "spo2_min": 96.1,
+      "spo2_max": 97.6,
+      "sleep": {
+        "hours_asleep": 6.8,
+        "minutes_asleep": 408,
+        "start_time": "22:44",
+        "end_time": "06:21",
+        "stages": {
+          "deep": 58,
+          "rem": 79,
+          "light": 214,
+          "wake": 13
+        },
+        "_fake": true
+      },
+      "_hr_fake": true,
+      "_spo2_fake": true
+    },
+    "2026-03-22": {
+      "date": "2026-03-22",
+      "steps": 4831,
+      "resting_bpm": 81.2,
+      "avg_bpm": 84.6,
+      "min_bpm": 78.7,
+      "max_bpm": 89.8,
+      "spo2_avg": 96.8,
+      "spo2_min": 96.2,
+      "spo2_max": 97.5,
+      "sleep": {
+        "hours_asleep": 7.2,
+        "minutes_asleep": 432,
+        "start_time": "23:05",
+        "end_time": "07:18",
+        "stages": {
+          "deep": 80,
+          "rem": 96,
+          "light": 231,
+          "wake": 28
+        },
+        "_fake": true
+      },
+      "_hr_fake": true,
+      "_spo2_fake": true
+    },
+    "2026-03-23": {
+      "date": "2026-03-23",
+      "steps": 6785,
+      "resting_bpm": 81.6,
+      "avg_bpm": 85.6,
+      "min_bpm": 78.9,
+      "max_bpm": 92.8,
+      "spo2_avg": 96.7,
+      "spo2_min": 95.6,
+      "spo2_max": 97.3,
+      "sleep": {
+        "hours_asleep": 6.2,
+        "minutes_asleep": 372,
+        "start_time": "23:40",
+        "end_time": "06:10",
+        "stages": {
+          "deep": 55,
+          "rem": 72,
+          "light": 177,
+          "wake": 30
+        },
+        "_fake": true
+      },
+      "_hr_fake": true,
+      "_spo2_fake": true
+    },
+    "2026-03-24": {
+      "date": "2026-03-24",
+      "steps": 6735,
+      "resting_bpm": 80.1,
+      "avg_bpm": 82.5,
+      "min_bpm": 78.6,
+      "max_bpm": 90.1,
+      "spo2_avg": 97.0,
+      "spo2_min": 96.4,
+      "spo2_max": 97.9,
+      "sleep": {
+        "hours_asleep": 6.7,
+        "minutes_asleep": 402,
+        "start_time": "22:43",
+        "end_time": "06:53",
+        "stages": {
+          "deep": 72,
+          "rem": 73,
+          "light": 213,
+          "wake": 20
+        },
+        "_fake": true
+      },
+      "_hr_fake": true,
+      "_spo2_fake": true
+    },
+    "2026-03-25": {
+      "date": "2026-03-25",
+      "steps": 6405,
+      "resting_bpm": 81.2,
+      "avg_bpm": 84.4,
+      "min_bpm": 79.8,
+      "max_bpm": 89.4,
+      "spo2_avg": 97.0,
+      "spo2_min": 95.9,
+      "spo2_max": 97.5,
+      "sleep": {
+        "hours_asleep": 7.0,
+        "minutes_asleep": 420,
+        "start_time": "23:09",
+        "end_time": "06:08",
+        "stages": {
+          "deep": 58,
+          "rem": 92,
+          "light": 200,
+          "wake": 28
+        },
+        "_fake": true
+      },
+      "_hr_fake": true,
+      "_spo2_fake": true
+    },
+    "2026-03-26": {
+      "date": "2026-03-26",
+      "steps": 8681,
+      "resting_bpm": 85.6,
+      "avg_bpm": 87.0,
+      "min_bpm": 83.6,
+      "max_bpm": 93.5,
+      "spo2_avg": 97.6,
+      "spo2_min": 96.6,
+      "spo2_max": 98.6,
+      "sleep": {
+        "hours_asleep": 7.0,
+        "minutes_asleep": 420,
+        "start_time": "22:40",
+        "end_time": "05:50",
+        "stages": {
+          "deep": 73,
+          "rem": 93,
+          "light": 205,
+          "wake": 29
+        },
+        "_fake": true
+      },
+      "_hr_fake": true,
+      "_spo2_fake": true
+    },
+    "2026-03-27": {
+      "date": "2026-03-27",
+      "steps": 15293,
+      "resting_bpm": 85.2,
+      "avg_bpm": 86.2,
+      "min_bpm": 82.8,
+      "max_bpm": 92.3,
+      "spo2_avg": 97.6,
+      "spo2_min": 96.3,
+      "spo2_max": 98.2,
+      "sleep": {
+        "hours_asleep": 6.5,
+        "minutes_asleep": 390,
+        "start_time": "23:49",
+        "end_time": "07:21",
+        "stages": {
+          "deep": 50,
+          "rem": 82,
+          "light": 193,
+          "wake": 18
+        },
+        "_fake": true
+      },
+      "_hr_fake": true,
+      "_spo2_fake": true
+    },
+    "2026-03-28": {
+      "date": "2026-03-28",
+      "steps": 2627,
+      "resting_bpm": 78.7,
+      "avg_bpm": 81.6,
+      "min_bpm": 76.0,
+      "max_bpm": 86.6,
+      "spo2_avg": 96.9,
+      "spo2_min": 96.4,
+      "spo2_max": 97.8,
+      "sleep": {
+        "hours_asleep": 5.9,
+        "minutes_asleep": 354,
+        "start_time": "23:48",
+        "end_time": "05:34",
+        "stages": {
+          "deep": 69,
+          "rem": 86,
+          "light": 191,
+          "wake": 29
+        },
+        "_fake": true
+      },
+      "_hr_fake": true,
+      "_spo2_fake": true
+    },
+    "2026-03-29": {
+      "date": "2026-03-29",
+      "steps": 2613,
+      "resting_bpm": 82.8,
+      "avg_bpm": 86.3,
+      "min_bpm": 81.2,
+      "max_bpm": 88.6,
+      "spo2_avg": 96.7,
+      "spo2_min": 95.7,
+      "spo2_max": 97.3,
+      "sleep": {
+        "hours_asleep": 7.0,
+        "minutes_asleep": 420,
+        "start_time": "22:05",
+        "end_time": "07:31",
+        "stages": {
+          "deep": 77,
+          "rem": 104,
+          "light": 211,
+          "wake": 14
+        },
+        "_fake": true
+      },
+      "_hr_fake": true,
+      "_spo2_fake": true
+    },
+    "2026-03-30": {
+      "date": "2026-03-30",
+      "steps": 17089,
+      "resting_bpm": 81,
+      "avg_bpm": 83.0,
+      "min_bpm": 81,
+      "max_bpm": 85,
+      "spo2_avg": 97.3,
+      "spo2_min": 97,
+      "spo2_max": 98,
+      "sleep": {
+        "hours_asleep": 6.0,
+        "minutes_asleep": 360,
+        "start_time": "23:13",
+        "end_time": "07:48",
+        "stages": {
+          "deep": 64,
+          "rem": 69,
+          "light": 173,
+          "wake": 30
+        },
+        "_fake": true
+      }
+    },
+    "2026-03-31": {
+      "date": "2026-03-31",
+      "steps": 3921,
+      "resting_bpm": 79,
+      "avg_bpm": 80.0,
+      "min_bpm": 79,
+      "max_bpm": 81,
+      "spo2_avg": 97.0,
+      "spo2_min": 97,
+      "spo2_max": 97,
+      "sleep": {
+        "hours_asleep": 6.78,
+        "minutes_asleep": 407,
+        "start_time": "03:38",
+        "end_time": "10:25"
+      }
+    },
+    "2026-04-01": {
+      "date": "2026-04-01",
+      "steps": 8595,
+      "resting_bpm": 87,
+      "avg_bpm": 89.0,
+      "min_bpm": 87,
+      "max_bpm": 91,
+      "spo2_avg": 97.0,
+      "spo2_min": 97,
+      "spo2_max": 97,
+      "sleep": {
+        "hours_asleep": 6.05,
+        "minutes_asleep": 363,
+        "start_time": "01:05",
+        "end_time": "07:08"
+      }
+    },
+    "2026-04-02": {
+      "date": "2026-04-02",
+      "steps": 0,
+      "resting_bpm": null,
+      "avg_bpm": null,
+      "min_bpm": null,
+      "max_bpm": null,
+      "spo2_avg": null,
+      "spo2_min": null,
+      "spo2_max": null,
+      "sleep": null
+    }
+  },
+  "summary": {
+    "avg_daily_steps": 7807,
+    "avg_heart_rate": 84.5,
+    "avg_sleep_hours": 6.61,
+    "today_steps": 0
+  }
+}

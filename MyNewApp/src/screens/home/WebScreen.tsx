@@ -94,7 +94,7 @@ const styles = StyleSheet.create({
   },
   refreshBtn: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 100,
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   refreshText: {
-    color: '#fff',
+    color: theme.colors.bgDark,
     fontSize: 14,
     fontWeight: '600',
   } as any,
@@ -124,10 +124,8 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 72,
     height: 72,
-    borderRadius: 36,
-    backgroundColor: theme.colors.glassLight,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0,201,167,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: theme.spacing.m,
@@ -148,8 +146,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: theme.borderRadius.m,
     width: '100%',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   urlLabel: {
     color: theme.colors.textMuted,

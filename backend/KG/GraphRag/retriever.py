@@ -9,7 +9,7 @@ All functions return plain Python dicts/lists — no Neo4j objects leak out.
 """
 
 from neo4j import GraphDatabase
-from config import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, MAX_HOPS, MAX_CONTEXT_NODES
+from graphrag_config import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, MAX_HOPS, MAX_CONTEXT_NODES
 
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 

@@ -1,16 +1,34 @@
+# ── FastAPI Backend ──────────────────────────
 fastapi
 uvicorn
-streamlit
-requests
-matplotlib
 python-multipart
+
+# ── Auth & Services ─────────────────────────
 twilio
-python-dotenv
-pdf2image
-pytesseract
-pymongo
-sentence-transformers
-huggingface-hub
-pyvis
 supabase
 bcrypt
+python-dotenv
+
+# ── OCR & Document Processing ───────────────
+pdf2image
+pytesseract
+pymupdf
+Pillow
+
+# ── ML & AI ─────────────────────────────────
+pandas
+numpy
+joblib
+scikit-learn
+sentence-transformers
+huggingface-hub
+
+# ── Neo4j Knowledge Graph ───────────────────
+neo4j
+certifi
+
+# ── Gemini (Google GenAI) ───────────────────
+google-genai
+
+# ── MongoDB ─────────────────────────────────
+pymongo
