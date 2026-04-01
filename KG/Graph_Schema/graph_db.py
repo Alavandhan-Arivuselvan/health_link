@@ -51,6 +51,20 @@ def upsert_patient_profile(profile: dict):
     Create or update the single PatientProfile node.
     profile keys: name, dob, sex, blood_group, chronic_conditions (list)
     """
+    # Sanitize chronic_conditions: LLM may return list of dicts instead of strings
+    raw_cc = profile.get("chronic_conditions", [])
+    if isinstance(raw_cc, list):
+        clean_cc = []
+        for item in raw_cc:
+            if isinstance(item, dict):
+                clean_cc.append(item.get("name") or item.get("id") or str(item))
+            elif isinstance(item, str):
+                clean_cc.append(item)
+            else:
+                clean_cc.append(str(item))
+    else:
+        clean_cc = []
+
     with driver.session() as session:
         session.run("""
             MERGE (p:PatientProfile {id: 'patient'})
@@ -65,7 +79,7 @@ def upsert_patient_profile(profile: dict):
             dob=profile.get("dob"),
             sex=profile.get("sex"),
             blood_group=profile.get("blood_group"),
-            chronic_conditions=profile.get("chronic_conditions", []),
+            chronic_conditions=clean_cc,
             now=datetime.now().isoformat()
         )
     print(f"✓ PatientProfile upserted: {profile.get('name')}")

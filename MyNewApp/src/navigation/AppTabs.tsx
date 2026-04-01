@@ -43,23 +43,27 @@ const AppTabs = () => {
                 tabBarActiveTintColor: theme.colors.accent,
                 tabBarInactiveTintColor: theme.colors.gray,
                 tabBarStyle: {
+                    position: 'absolute',
+                    bottom: 16,
+                    left: 16,
+                    right: 16,
+                    height: 64,
+                    borderRadius: 999,
                     backgroundColor: theme.colors.bgCard,
                     borderTopWidth: 0,
-                    elevation: 20,
-                    shadowColor: '#000',
-                    shadowOpacity: 0.4,
-                    shadowRadius: 15,
-                    height: 80,
-                    paddingBottom: 20,
-                    paddingTop: 10,
+                    borderWidth: 1,
+                    borderColor: theme.colors.border,
+                    paddingBottom: 8,
+                    paddingTop: 8,
+                    ...theme.shadow.card,
                 },
                 tabBarLabelStyle: {
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: '600' as const,
                     letterSpacing: 0.3,
                 },
                 tabBarIcon: ({ color, size }) => (
-                    <Ionicons name={getTabIcon(route.name)} size={22} color={color} />
+                    <Ionicons name={getTabIcon(route.name)} size={20} color={color} />
                 ),
             })}
         >

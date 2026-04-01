@@ -211,7 +211,7 @@ def extract_structured_data(ocr_text):
 
     full_prompt = f"{STRICT_PROMPT}\n{ocr_text}\n[/INST]"
 
-    print("⏳ Calling LLM to extract JSON...")
+    # print("⏳ Calling LLM to extract JSON...")
 
     try:
 

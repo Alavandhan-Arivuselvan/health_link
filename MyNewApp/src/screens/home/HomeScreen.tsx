@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import GradientBackground from '../../components/GradientBackground';
 import { theme } from '../../theme';
 import { BASE_URL } from '../../config/host';
@@ -27,7 +26,6 @@ interface FeatureCard {
     title: string;
     subtitle: string;
     icon: keyof typeof Ionicons.glyphMap;
-    gradient: [string, string];
     iconColor: string;
     route?: string;
     isTab?: boolean;
@@ -39,7 +37,6 @@ const FEATURES: FeatureCard[] = [
         title: 'Dashboard',
         subtitle: 'Health score & metrics',
         icon: 'analytics',
-        gradient: ['rgba(79,195,247,0.20)', 'rgba(41,128,185,0.06)'],
         iconColor: '#4FC3F7',
         route: 'DashboardView',
     },
@@ -48,7 +45,6 @@ const FEATURES: FeatureCard[] = [
         title: 'AI Chat',
         subtitle: 'Ask about your health',
         icon: 'chatbubble-ellipses',
-        gradient: ['rgba(186,104,200,0.20)', 'rgba(142,68,173,0.06)'],
         iconColor: '#BA68C8',
         route: 'Chat',
         isTab: true,
@@ -58,7 +54,6 @@ const FEATURES: FeatureCard[] = [
         title: 'Knowledge Graph',
         subtitle: 'Interactive health map',
         icon: 'globe',
-        gradient: ['rgba(255,183,77,0.20)', 'rgba(243,156,18,0.06)'],
         iconColor: '#FFB74D',
         route: 'Web',
         isTab: true,
@@ -68,8 +63,7 @@ const FEATURES: FeatureCard[] = [
         title: 'Upload Docs',
         subtitle: 'OCR medical docs',
         icon: 'cloud-upload',
-        gradient: ['rgba(0,212,170,0.15)', 'rgba(0,184,148,0.05)'],
-        iconColor: '#00D4AA',
+        iconColor: '#00C9A7',
         route: 'Upload',
         isTab: true,
     },
@@ -78,7 +72,6 @@ const FEATURES: FeatureCard[] = [
         title: 'Health Stats',
         subtitle: 'Smartwatch analytics',
         icon: 'pulse',
-        gradient: ['rgba(239,83,80,0.20)', 'rgba(211,47,47,0.06)'],
         iconColor: '#EF5350',
         route: 'Stats',
         isTab: true,
@@ -88,7 +81,6 @@ const FEATURES: FeatureCard[] = [
         title: 'QR Profile',
         subtitle: 'Share health profile',
         icon: 'qr-code',
-        gradient: ['rgba(100,181,246,0.20)', 'rgba(30,136,229,0.06)'],
         iconColor: '#64B5F6',
         route: 'QR',
         isTab: true,
@@ -147,23 +139,15 @@ const HomeScreen = () => {
     const renderFeatureCard = (feature: FeatureCard) => (
         <TouchableOpacity
             key={feature.id}
-            activeOpacity={0.85}
+            activeOpacity={0.75}
             onPress={() => navigateToFeature(feature)}
             style={styles.featureCard}
         >
-            <LinearGradient
-                colors={feature.gradient as [string, string]}
-                style={styles.featureGradient}
-            >
-                <View style={[styles.featureIconCircle, { backgroundColor: feature.iconColor + '20' }]}>
-                    <Ionicons name={feature.icon} size={24} color={feature.iconColor} />
-                </View>
-                <View style={styles.featureText}>
-                    <Text style={styles.featureTitle}>{feature.title}</Text>
-                    <Text style={styles.featureSub}>{feature.subtitle}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} style={{ marginLeft: 'auto' }} />
-            </LinearGradient>
+            <View style={[styles.featureIconCircle, { backgroundColor: feature.iconColor + '18' }]}>
+                <Ionicons name={feature.icon} size={22} color={feature.iconColor} />
+            </View>
+            <Text style={styles.featureTitle}>{feature.title}</Text>
+            <Text style={styles.featureSub}>{feature.subtitle}</Text>
         </TouchableOpacity>
     );
 
@@ -181,13 +165,13 @@ const HomeScreen = () => {
                     <TouchableOpacity style={styles.headerIconBtn} onPress={openNotifications}>
                         <Ionicons name="notifications-outline" size={22} color={theme.colors.text} />
                         {nudgeCount > 0 && (
-                            <View style={styles.badge}>
-                                <Text style={styles.badgeText}>{nudgeCount > 9 ? '9+' : nudgeCount}</Text>
+                            <View style={styles.notifBadge}>
+                                <Text style={styles.notifBadgeText}>{nudgeCount > 9 ? '9+' : nudgeCount}</Text>
                             </View>
                         )}
                     </TouchableOpacity>
                     <View style={styles.avatar}>
-                        <Ionicons name="person" size={20} color={theme.colors.accent} />
+                        <Ionicons name="person" size={18} color={theme.colors.accent} />
                     </View>
                 </View>
             </View>
@@ -197,10 +181,10 @@ const HomeScreen = () => {
                 <View style={styles.gridWrap}>
                     {FEATURES.map(renderFeatureCard)}
                 </View>
-                <View style={{ height: 30 }} />
+                <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* ── NOTIFICATIONS MODAL (from top) ──── */}
+            {/* ── NOTIFICATIONS MODAL ──── */}
             <Modal visible={notifVisible} animationType="slide" transparent onRequestClose={() => setNotifVisible(false)}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
@@ -259,7 +243,7 @@ const HomeScreen = () => {
     );
 };
 
-const CARD_GAP = 10;
+const CARD_GAP = 12;
 const CARD_W = (SCREEN_W - 32 - CARD_GAP) / 2;
 
 const styles = StyleSheet.create({
@@ -267,48 +251,49 @@ const styles = StyleSheet.create({
 
     header: {
         flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-        paddingTop: 48, paddingHorizontal: 20, paddingBottom: 10,
-        borderBottomWidth: 1, borderBottomColor: theme.colors.border,
+        paddingTop: 48, paddingHorizontal: 20, paddingBottom: 16,
     },
-    greeting: { fontSize: 13, color: theme.colors.textMuted, marginBottom: 1 },
+    greeting: { fontSize: 13, color: theme.colors.textMuted, marginBottom: 2 },
     headerTitle: { fontSize: 24, fontWeight: '800', color: theme.colors.text, letterSpacing: -0.5 } as any,
     headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     headerIconBtn: {
         width: 40, height: 40, borderRadius: 20,
-        backgroundColor: theme.colors.glassLight, borderWidth: 1, borderColor: theme.colors.border,
+        backgroundColor: theme.colors.bgCard,
         justifyContent: 'center', alignItems: 'center',
     },
-    badge: {
+    notifBadge: {
         position: 'absolute', top: 2, right: 2,
         minWidth: 16, height: 16, borderRadius: 8,
-        backgroundColor: '#FF5252', justifyContent: 'center', alignItems: 'center',
+        backgroundColor: '#F85149', justifyContent: 'center', alignItems: 'center',
         paddingHorizontal: 3, borderWidth: 1.5, borderColor: theme.colors.bgDark,
     },
-    badgeText: { fontSize: 9, fontWeight: '800', color: '#fff' } as any,
+    notifBadgeText: { fontSize: 9, fontWeight: '800', color: '#fff' } as any,
     avatar: {
         width: 40, height: 40, borderRadius: 20,
-        backgroundColor: theme.colors.accent + '20', borderWidth: 1.5, borderColor: theme.colors.accent + '50',
+        backgroundColor: 'rgba(0,201,167,0.12)',
         justifyContent: 'center', alignItems: 'center',
     },
 
-    scrollContent: { paddingHorizontal: 16, paddingTop: 16 },
-    sectionLabel: { ...theme.typography.label, marginBottom: 12 },
+    scrollContent: { paddingHorizontal: 16, paddingTop: 8 },
+    sectionLabel: { ...theme.typography.label, marginBottom: 14 },
     gridWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: CARD_GAP },
 
     featureCard: {
         width: CARD_W,
-        borderWidth: 1, borderColor: theme.colors.border, borderRadius: 20, overflow: 'hidden',
+        backgroundColor: theme.colors.bgCard,
+        borderRadius: theme.borderRadius.m,
+        padding: 16,
+        minHeight: 120,
+        ...theme.shadow.card,
     },
-    featureGradient: { padding: 16, minHeight: 110, justifyContent: 'center' },
     featureIconCircle: {
-        width: 42, height: 42, borderRadius: 21,
-        justifyContent: 'center', alignItems: 'center', marginBottom: 10,
+        width: 42, height: 42, borderRadius: 14,
+        justifyContent: 'center', alignItems: 'center', marginBottom: 12,
     },
-    featureText: {},
     featureTitle: { fontSize: 15, fontWeight: '700', color: theme.colors.text, marginBottom: 3 } as any,
     featureSub: { fontSize: 11, color: theme.colors.textMuted, lineHeight: 15 },
 
-    /* Notification modal — slides from top */
+    /* Notification modal */
     modalOverlay: {
         flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'flex-start',
@@ -327,7 +312,7 @@ const styles = StyleSheet.create({
     modalTitle: { flex: 1, fontSize: 20, fontWeight: '700', color: theme.colors.text } as any,
     modalClose: {
         width: 36, height: 36, borderRadius: 18,
-        backgroundColor: theme.colors.glassLight, justifyContent: 'center', alignItems: 'center',
+        backgroundColor: theme.colors.bgCardLight, justifyContent: 'center', alignItems: 'center',
     },
     nudgeCard: {
         flexDirection: 'row', alignItems: 'flex-start',

@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     },
     backBtn: {
         width: 36, height: 36, borderRadius: 18,
-        backgroundColor: theme.colors.glassLight, justifyContent: 'center', alignItems: 'center',
+        backgroundColor: theme.colors.bgCard, justifyContent: 'center', alignItems: 'center',
     },
     patientInfo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     patientText: { color: theme.colors.text, fontSize: 14, fontWeight: '600' } as any,
@@ -218,18 +218,18 @@ const styles = StyleSheet.create({
     tabBar: {
         flexDirection: 'row', marginHorizontal: 16, marginBottom: 8,
         backgroundColor: theme.colors.bgCard, borderRadius: theme.borderRadius.m,
-        borderWidth: 1, borderColor: theme.colors.border, padding: 4,
+        padding: 4,
     },
     tab: {
         flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
         paddingVertical: 10, borderRadius: theme.borderRadius.m - 2, gap: 6,
     },
-    tabActive: { backgroundColor: theme.colors.glassLight },
+    tabActive: { backgroundColor: 'rgba(0,201,167,0.1)' },
     tabText: { color: theme.colors.textMuted, fontSize: 14, fontWeight: '600' } as any,
     tabTextActive: { color: theme.colors.accent },
     graphContainer: {
         flex: 1, marginHorizontal: 16, marginBottom: 16, borderRadius: 12,
-        overflow: 'hidden', borderWidth: 1, borderColor: theme.colors.border,
+        overflow: 'hidden',
     },
     chatContainer: { flex: 1 },
     messageList: { paddingHorizontal: 16, paddingBottom: 8 },
@@ -243,19 +243,19 @@ const styles = StyleSheet.create({
     },
     botBubble: {
         alignSelf: 'flex-start', backgroundColor: theme.colors.bgCard,
-        borderWidth: 1, borderColor: theme.colors.border, borderBottomLeftRadius: 4,
+        borderBottomLeftRadius: 4,
     },
     messageText: { fontSize: 14, lineHeight: 20 },
     userText: { color: theme.colors.bgDark },
     botText: { color: theme.colors.text },
     inputRow: {
         flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-        paddingVertical: 10, gap: 8, borderTopWidth: 1, borderTopColor: theme.colors.border,
+        paddingVertical: 10, gap: 8,
     },
     textInput: {
         flex: 1, backgroundColor: theme.colors.bgCard, color: theme.colors.text,
         paddingHorizontal: 16, paddingVertical: 12, borderRadius: 24,
-        borderWidth: 1, borderColor: theme.colors.border, fontSize: 14,
+        fontSize: 14,
     },
     sendBtn: {
         width: 44, height: 44, borderRadius: 22, backgroundColor: theme.colors.accent,

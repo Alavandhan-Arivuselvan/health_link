@@ -74,7 +74,7 @@ const DoctorLoginScreen = () => {
                     {/* Brand area */}
                     <View style={styles.brandArea}>
                         <View style={styles.logoCircle}>
-                            <Ionicons name="medkit" size={32} color={theme.colors.accent} />
+                            <Ionicons name="medkit" size={28} color={theme.colors.accent} />
                         </View>
                         <Text style={styles.brandName}>Doctor Portal</Text>
                         <Text style={styles.brandTagline}>Secure medical professional access</Text>
@@ -147,12 +147,10 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.xl,
     },
     logoCircle: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: theme.colors.glassBg,
-        borderWidth: 1.5,
-        borderColor: theme.colors.border,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(0,201,167,0.1)',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: theme.spacing.m,
@@ -169,11 +167,9 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     card: {
-        backgroundColor: theme.colors.glassBg,
+        backgroundColor: theme.colors.bgCard,
         padding: theme.spacing.l,
-        borderRadius: theme.borderRadius.xl,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.m,
         ...theme.shadow.card,
     },
     title: {

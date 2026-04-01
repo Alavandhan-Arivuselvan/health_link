@@ -12,7 +12,6 @@ import {
     RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import GradientBackground from '../../components/GradientBackground';
 import { theme } from '../../theme';
 import { BASE_URL } from '../../config/host';
@@ -128,8 +127,7 @@ const FitbitInsightsScreen = ({ navigation }: any) => {
 
                     {/* Energy Forecast */}
                     {energy && (
-                        <LinearGradient
-                            colors={['rgba(129,199,132,0.18)', 'rgba(76,175,80,0.04)', 'transparent']}
+                        <View
                             style={styles.insightCard}
                         >
                             <View style={styles.cardHeader}>
@@ -155,13 +153,12 @@ const FitbitInsightsScreen = ({ navigation }: any) => {
                                 </View>
                             </View>
                             {energy.insight ? <Text style={styles.insightText}>{energy.insight}</Text> : null}
-                        </LinearGradient>
+                        </View>
                     )}
 
                     {/* Sleep Consistency */}
                     {sleep && (
-                        <LinearGradient
-                            colors={['rgba(100,181,246,0.18)', 'rgba(30,136,229,0.04)', 'transparent']}
+                        <View
                             style={styles.insightCard}
                         >
                             <View style={styles.cardHeader}>
@@ -185,7 +182,7 @@ const FitbitInsightsScreen = ({ navigation }: any) => {
                                 </View>
                             </View>
                             {sleep.nudge ? <Text style={styles.insightText}>{sleep.nudge}</Text> : null}
-                        </LinearGradient>
+                        </View>
                     )}
 
                     {/* Personalized Nudges */}
@@ -216,12 +213,10 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row', alignItems: 'center',
         paddingTop: 54, paddingHorizontal: 16, paddingBottom: 14,
-        borderBottomWidth: 1, borderBottomColor: theme.colors.border,
     },
     backBtn: {
         width: 40, height: 40, borderRadius: 20,
-        backgroundColor: theme.colors.glassLight, justifyContent: 'center', alignItems: 'center',
-        borderWidth: 1, borderColor: theme.colors.border,
+        backgroundColor: theme.colors.bgCard, justifyContent: 'center', alignItems: 'center',
     },
     headerTitle: {
         flex: 1, textAlign: 'center',
@@ -235,8 +230,8 @@ const styles = StyleSheet.create({
     syncText: { fontSize: 12, color: theme.colors.textMuted, textAlign: 'center', marginBottom: 16 },
 
     insightCard: {
-        borderRadius: 20, padding: 20, marginBottom: 16,
-        borderWidth: 1, borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.m, padding: 20, marginBottom: 16,
+        backgroundColor: theme.colors.bgCard,
     },
     cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
     cardIcon: {
@@ -259,8 +254,7 @@ const styles = StyleSheet.create({
 
     nudgeCard: {
         flexDirection: 'row', alignItems: 'center',
-        backgroundColor: theme.colors.bgCard, borderRadius: 16, padding: 14, marginBottom: 8,
-        borderWidth: 1, borderColor: theme.colors.border,
+        backgroundColor: theme.colors.bgCard, borderRadius: theme.borderRadius.m, padding: 14, marginBottom: 8,
     },
     nudgeDot: { width: 4, height: 30, borderRadius: 2, marginRight: 12 },
     nudgeIcon: { marginRight: 10 },

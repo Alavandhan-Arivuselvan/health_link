@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     View,
     Text,
@@ -12,10 +13,10 @@ import {
     RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import GradientBackground from '../../components/GradientBackground';
 import { theme } from '../../theme';
 import { BASE_URL } from '../../config/host';
+import Svg, { Path, Circle, Line, Rect, Defs, LinearGradient as SvgGrad, Stop } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -56,81 +57,81 @@ interface RefRange {
 
 const REF_RANGES: Record<string, RefRange> = {
     // ─── Haematology ───
-    'haemoglobin':       { min: 5, max: 20, normalLow: 12, normalHigh: 17.5, icon: 'water', iconColor: '#EF5350' },
-    'hemoglobin':        { min: 5, max: 20, normalLow: 12, normalHigh: 17.5, icon: 'water', iconColor: '#EF5350' },
-    'hb':                { min: 5, max: 20, normalLow: 12, normalHigh: 17.5, icon: 'water', iconColor: '#EF5350' },
-    'wbc':               { min: 2000, max: 15000, normalLow: 4000, normalHigh: 11000, icon: 'ellipse-outline', iconColor: '#42A5F5' },
-    'total wbc count':   { min: 2000, max: 15000, normalLow: 4000, normalHigh: 11000, icon: 'ellipse-outline', iconColor: '#42A5F5' },
-    'neutrophils':       { min: 0, max: 100, normalLow: 40, normalHigh: 70, icon: 'ellipse', iconColor: '#66BB6A' },
-    'lymphocyte':        { min: 0, max: 100, normalLow: 20, normalHigh: 40, icon: 'ellipse', iconColor: '#AB47BC' },
-    'lymphocytes':       { min: 0, max: 100, normalLow: 20, normalHigh: 40, icon: 'ellipse', iconColor: '#AB47BC' },
-    'eosinophils':       { min: 0, max: 20, normalLow: 1, normalHigh: 6, icon: 'ellipse', iconColor: '#26A69A' },
-    'monocytes':         { min: 0, max: 15, normalLow: 2, normalHigh: 10, icon: 'ellipse', iconColor: '#78909C' },
-    'basophils':         { min: 0, max: 3, normalLow: 0, normalHigh: 1, icon: 'ellipse', iconColor: '#90A4AE' },
-    'rbc':               { min: 2, max: 7, normalLow: 4.0, normalHigh: 5.5, icon: 'ellipse', iconColor: '#EF5350' },
-    'rbc count':         { min: 2, max: 7, normalLow: 4.0, normalHigh: 5.5, icon: 'ellipse', iconColor: '#EF5350' },
-    'platelet':          { min: 50000, max: 500000, normalLow: 150000, normalHigh: 400000, icon: 'grid', iconColor: '#AB47BC' },
-    'platelets':         { min: 50000, max: 500000, normalLow: 150000, normalHigh: 400000, icon: 'grid', iconColor: '#AB47BC' },
-    'pcv':               { min: 20, max: 60, normalLow: 36, normalHigh: 50, icon: 'analytics', iconColor: '#5C6BC0' },
-    'hematocrit':        { min: 20, max: 60, normalLow: 36, normalHigh: 50, icon: 'analytics', iconColor: '#5C6BC0' },
-    'mcv':               { min: 50, max: 110, normalLow: 80, normalHigh: 100, icon: 'analytics', iconColor: '#7E57C2' },
-    'mch':               { min: 15, max: 40, normalLow: 27, normalHigh: 33, icon: 'analytics', iconColor: '#26C6DA' },
-    'mchc':              { min: 25, max: 40, normalLow: 32, normalHigh: 36, icon: 'analytics', iconColor: '#8D6E63' },
-    'esr':               { min: 0, max: 50, normalLow: 0, normalHigh: 20, icon: 'timer', iconColor: '#78909C' },
+    'haemoglobin': { min: 5, max: 20, normalLow: 12, normalHigh: 17.5, icon: 'water', iconColor: '#EF5350' },
+    'hemoglobin': { min: 5, max: 20, normalLow: 12, normalHigh: 17.5, icon: 'water', iconColor: '#EF5350' },
+    'hb': { min: 5, max: 20, normalLow: 12, normalHigh: 17.5, icon: 'water', iconColor: '#EF5350' },
+    'wbc': { min: 2000, max: 15000, normalLow: 4000, normalHigh: 11000, icon: 'ellipse-outline', iconColor: '#42A5F5' },
+    'total wbc count': { min: 2000, max: 15000, normalLow: 4000, normalHigh: 11000, icon: 'ellipse-outline', iconColor: '#42A5F5' },
+    'neutrophils': { min: 0, max: 100, normalLow: 40, normalHigh: 70, icon: 'ellipse', iconColor: '#66BB6A' },
+    'lymphocyte': { min: 0, max: 100, normalLow: 20, normalHigh: 40, icon: 'ellipse', iconColor: '#AB47BC' },
+    'lymphocytes': { min: 0, max: 100, normalLow: 20, normalHigh: 40, icon: 'ellipse', iconColor: '#AB47BC' },
+    'eosinophils': { min: 0, max: 20, normalLow: 1, normalHigh: 6, icon: 'ellipse', iconColor: '#26A69A' },
+    'monocytes': { min: 0, max: 15, normalLow: 2, normalHigh: 10, icon: 'ellipse', iconColor: '#78909C' },
+    'basophils': { min: 0, max: 3, normalLow: 0, normalHigh: 1, icon: 'ellipse', iconColor: '#90A4AE' },
+    'rbc': { min: 2, max: 7, normalLow: 4.0, normalHigh: 5.5, icon: 'ellipse', iconColor: '#EF5350' },
+    'rbc count': { min: 2, max: 7, normalLow: 4.0, normalHigh: 5.5, icon: 'ellipse', iconColor: '#EF5350' },
+    'platelet': { min: 50000, max: 500000, normalLow: 150000, normalHigh: 400000, icon: 'grid', iconColor: '#AB47BC' },
+    'platelets': { min: 50000, max: 500000, normalLow: 150000, normalHigh: 400000, icon: 'grid', iconColor: '#AB47BC' },
+    'pcv': { min: 20, max: 60, normalLow: 36, normalHigh: 50, icon: 'analytics', iconColor: '#5C6BC0' },
+    'hematocrit': { min: 20, max: 60, normalLow: 36, normalHigh: 50, icon: 'analytics', iconColor: '#5C6BC0' },
+    'mcv': { min: 50, max: 110, normalLow: 80, normalHigh: 100, icon: 'analytics', iconColor: '#7E57C2' },
+    'mch': { min: 15, max: 40, normalLow: 27, normalHigh: 33, icon: 'analytics', iconColor: '#26C6DA' },
+    'mchc': { min: 25, max: 40, normalLow: 32, normalHigh: 36, icon: 'analytics', iconColor: '#8D6E63' },
+    'esr': { min: 0, max: 50, normalLow: 0, normalHigh: 20, icon: 'timer', iconColor: '#78909C' },
     // ─── Liver ───
-    'bilirubin':         { min: 0, max: 3, normalLow: 0.1, normalHigh: 1.0, icon: 'flask', iconColor: '#FFA726' },
-    'total bilirubin':   { min: 0, max: 3, normalLow: 0.1, normalHigh: 1.0, icon: 'flask', iconColor: '#FFA726' },
-    'direct bilirubin':  { min: 0, max: 1.5, normalLow: 0, normalHigh: 0.3, icon: 'flask', iconColor: '#FFA726' },
-    'sgot':              { min: 0, max: 100, normalLow: 5, normalHigh: 40, icon: 'flask', iconColor: '#78909C' },
-    'scot':              { min: 0, max: 100, normalLow: 5, normalHigh: 40, icon: 'flask', iconColor: '#78909C' },
-    'ast':               { min: 0, max: 100, normalLow: 5, normalHigh: 40, icon: 'flask', iconColor: '#78909C' },
-    'sgpt':              { min: 0, max: 100, normalLow: 7, normalHigh: 56, icon: 'flask', iconColor: '#78909C' },
-    'alt':               { min: 0, max: 100, normalLow: 7, normalHigh: 56, icon: 'flask', iconColor: '#78909C' },
+    'bilirubin': { min: 0, max: 3, normalLow: 0.1, normalHigh: 1.0, icon: 'flask', iconColor: '#FFA726' },
+    'total bilirubin': { min: 0, max: 3, normalLow: 0.1, normalHigh: 1.0, icon: 'flask', iconColor: '#FFA726' },
+    'direct bilirubin': { min: 0, max: 1.5, normalLow: 0, normalHigh: 0.3, icon: 'flask', iconColor: '#FFA726' },
+    'sgot': { min: 0, max: 100, normalLow: 5, normalHigh: 40, icon: 'flask', iconColor: '#78909C' },
+    'scot': { min: 0, max: 100, normalLow: 5, normalHigh: 40, icon: 'flask', iconColor: '#78909C' },
+    'ast': { min: 0, max: 100, normalLow: 5, normalHigh: 40, icon: 'flask', iconColor: '#78909C' },
+    'sgpt': { min: 0, max: 100, normalLow: 7, normalHigh: 56, icon: 'flask', iconColor: '#78909C' },
+    'alt': { min: 0, max: 100, normalLow: 7, normalHigh: 56, icon: 'flask', iconColor: '#78909C' },
     'alkaline phosphatase': { min: 20, max: 200, normalLow: 44, normalHigh: 147, icon: 'flask', iconColor: '#A1887F' },
-    'alk phosphatase':   { min: 20, max: 200, normalLow: 44, normalHigh: 147, icon: 'flask', iconColor: '#A1887F' },
-    'ggt':               { min: 0, max: 100, normalLow: 0, normalHigh: 45, icon: 'flask', iconColor: '#A1887F' },
+    'alk phosphatase': { min: 20, max: 200, normalLow: 44, normalHigh: 147, icon: 'flask', iconColor: '#A1887F' },
+    'ggt': { min: 0, max: 100, normalLow: 0, normalHigh: 45, icon: 'flask', iconColor: '#A1887F' },
     // ─── Protein ───
-    'total protein':     { min: 3, max: 10, normalLow: 6.0, normalHigh: 8.3, icon: 'nutrition', iconColor: '#4DB6AC' },
-    'albumin':           { min: 1, max: 6, normalLow: 3.5, normalHigh: 5.5, icon: 'nutrition', iconColor: '#4DB6AC' },
-    'globulin':          { min: 1, max: 5, normalLow: 2.0, normalHigh: 3.5, icon: 'nutrition', iconColor: '#4DB6AC' },
+    'total protein': { min: 3, max: 10, normalLow: 6.0, normalHigh: 8.3, icon: 'nutrition', iconColor: '#4DB6AC' },
+    'albumin': { min: 1, max: 6, normalLow: 3.5, normalHigh: 5.5, icon: 'nutrition', iconColor: '#4DB6AC' },
+    'globulin': { min: 1, max: 5, normalLow: 2.0, normalHigh: 3.5, icon: 'nutrition', iconColor: '#4DB6AC' },
     // ─── Renal ───
-    'creatinine':        { min: 0.2, max: 5, normalLow: 0.7, normalHigh: 1.3, icon: 'flask', iconColor: '#7E57C2' },
-    'urea':              { min: 5, max: 80, normalLow: 7, normalHigh: 20, icon: 'flask', iconColor: '#5C6BC0' },
-    'blood urea':        { min: 5, max: 80, normalLow: 7, normalHigh: 20, icon: 'flask', iconColor: '#5C6BC0' },
-    'bun':               { min: 2, max: 40, normalLow: 6, normalHigh: 20, icon: 'flask', iconColor: '#5C6BC0' },
-    'uric acid':         { min: 1, max: 12, normalLow: 3.4, normalHigh: 7.0, icon: 'flask', iconColor: '#8D6E63' },
+    'creatinine': { min: 0.2, max: 5, normalLow: 0.7, normalHigh: 1.3, icon: 'flask', iconColor: '#7E57C2' },
+    'urea': { min: 5, max: 80, normalLow: 7, normalHigh: 20, icon: 'flask', iconColor: '#5C6BC0' },
+    'blood urea': { min: 5, max: 80, normalLow: 7, normalHigh: 20, icon: 'flask', iconColor: '#5C6BC0' },
+    'bun': { min: 2, max: 40, normalLow: 6, normalHigh: 20, icon: 'flask', iconColor: '#5C6BC0' },
+    'uric acid': { min: 1, max: 12, normalLow: 3.4, normalHigh: 7.0, icon: 'flask', iconColor: '#8D6E63' },
     // ─── Diabetic ───
-    'fbs':               { min: 40, max: 300, normalLow: 70, normalHigh: 100, icon: 'water', iconColor: '#4FC3F7' },
-    'fasting glucose':   { min: 40, max: 300, normalLow: 70, normalHigh: 100, icon: 'water', iconColor: '#4FC3F7' },
+    'fbs': { min: 40, max: 300, normalLow: 70, normalHigh: 100, icon: 'water', iconColor: '#4FC3F7' },
+    'fasting glucose': { min: 40, max: 300, normalLow: 70, normalHigh: 100, icon: 'water', iconColor: '#4FC3F7' },
     'fasting blood sugar': { min: 40, max: 300, normalLow: 70, normalHigh: 100, icon: 'water', iconColor: '#4FC3F7' },
-    'ppbs':              { min: 40, max: 400, normalLow: 70, normalHigh: 140, icon: 'water', iconColor: '#4FC3F7' },
+    'ppbs': { min: 40, max: 400, normalLow: 70, normalHigh: 140, icon: 'water', iconColor: '#4FC3F7' },
     'random blood sugar': { min: 40, max: 400, normalLow: 70, normalHigh: 200, icon: 'water', iconColor: '#4FC3F7' },
-    'hba1c':             { min: 3, max: 15, normalLow: 4, normalHigh: 5.7, icon: 'pulse', iconColor: '#EF5350' },
+    'hba1c': { min: 3, max: 15, normalLow: 4, normalHigh: 5.7, icon: 'pulse', iconColor: '#EF5350' },
     'glycated hemoglobin': { min: 3, max: 15, normalLow: 4, normalHigh: 5.7, icon: 'pulse', iconColor: '#EF5350' },
     // ─── Lipid ───
-    'cholesterol':       { min: 100, max: 350, normalLow: 125, normalHigh: 200, icon: 'pulse', iconColor: '#FFB74D' },
+    'cholesterol': { min: 100, max: 350, normalLow: 125, normalHigh: 200, icon: 'pulse', iconColor: '#FFB74D' },
     'total cholesterol': { min: 100, max: 350, normalLow: 125, normalHigh: 200, icon: 'pulse', iconColor: '#FFB74D' },
-    'hdl':               { min: 20, max: 100, normalLow: 40, normalHigh: 60, icon: 'pulse', iconColor: '#66BB6A' },
-    'ldl':               { min: 40, max: 250, normalLow: 0, normalHigh: 100, icon: 'pulse', iconColor: '#EF5350' },
-    'vldl':              { min: 5, max: 60, normalLow: 2, normalHigh: 30, icon: 'pulse', iconColor: '#FFA726' },
-    'triglycerides':     { min: 30, max: 400, normalLow: 0, normalHigh: 150, icon: 'pulse', iconColor: '#FF7043' },
+    'hdl': { min: 20, max: 100, normalLow: 40, normalHigh: 60, icon: 'pulse', iconColor: '#66BB6A' },
+    'ldl': { min: 40, max: 250, normalLow: 0, normalHigh: 100, icon: 'pulse', iconColor: '#EF5350' },
+    'vldl': { min: 5, max: 60, normalLow: 2, normalHigh: 30, icon: 'pulse', iconColor: '#FFA726' },
+    'triglycerides': { min: 30, max: 400, normalLow: 0, normalHigh: 150, icon: 'pulse', iconColor: '#FF7043' },
     // ─── Thyroid ───
-    'tsh':               { min: 0, max: 15, normalLow: 0.4, normalHigh: 4.0, icon: 'fitness', iconColor: '#26A69A' },
-    't3':                { min: 40, max: 300, normalLow: 80, normalHigh: 200, icon: 'fitness', iconColor: '#26A69A' },
-    't4':                { min: 2, max: 20, normalLow: 5, normalHigh: 12, icon: 'fitness', iconColor: '#26A69A' },
+    'tsh': { min: 0, max: 15, normalLow: 0.4, normalHigh: 4.0, icon: 'fitness', iconColor: '#26A69A' },
+    't3': { min: 40, max: 300, normalLow: 80, normalHigh: 200, icon: 'fitness', iconColor: '#26A69A' },
+    't4': { min: 2, max: 20, normalLow: 5, normalHigh: 12, icon: 'fitness', iconColor: '#26A69A' },
     // ─── Electrolytes ───
-    'sodium':            { min: 120, max: 160, normalLow: 136, normalHigh: 145, icon: 'water', iconColor: '#42A5F5' },
-    'potassium':         { min: 2, max: 7, normalLow: 3.5, normalHigh: 5.0, icon: 'water', iconColor: '#FFA726' },
-    'calcium':           { min: 6, max: 14, normalLow: 8.5, normalHigh: 10.5, icon: 'water', iconColor: '#66BB6A' },
-    'chloride':          { min: 80, max: 120, normalLow: 98, normalHigh: 106, icon: 'water', iconColor: '#26C6DA' },
+    'sodium': { min: 120, max: 160, normalLow: 136, normalHigh: 145, icon: 'water', iconColor: '#42A5F5' },
+    'potassium': { min: 2, max: 7, normalLow: 3.5, normalHigh: 5.0, icon: 'water', iconColor: '#FFA726' },
+    'calcium': { min: 6, max: 14, normalLow: 8.5, normalHigh: 10.5, icon: 'water', iconColor: '#66BB6A' },
+    'chloride': { min: 80, max: 120, normalLow: 98, normalHigh: 106, icon: 'water', iconColor: '#26C6DA' },
     // ─── Other ───
-    'spo2':              { min: 80, max: 100, normalLow: 95, normalHigh: 100, icon: 'pulse', iconColor: '#42A5F5' },
-    'pulse':             { min: 40, max: 150, normalLow: 60, normalHigh: 100, icon: 'heart', iconColor: '#EF5350' },
-    'iron':              { min: 10, max: 300, normalLow: 60, normalHigh: 170, icon: 'flask', iconColor: '#8D6E63' },
-    'ferritin':          { min: 5, max: 500, normalLow: 20, normalHigh: 200, icon: 'flask', iconColor: '#8D6E63' },
-    'vitamin d':         { min: 5, max: 100, normalLow: 20, normalHigh: 50, icon: 'sunny', iconColor: '#FFA726' },
-    'vitamin b12':       { min: 100, max: 1000, normalLow: 200, normalHigh: 900, icon: 'flask', iconColor: '#EF5350' },
-    'crp':               { min: 0, max: 20, normalLow: 0, normalHigh: 3, icon: 'flask', iconColor: '#FF7043' },
+    'spo2': { min: 80, max: 100, normalLow: 95, normalHigh: 100, icon: 'pulse', iconColor: '#42A5F5' },
+    'pulse': { min: 40, max: 150, normalLow: 60, normalHigh: 100, icon: 'heart', iconColor: '#EF5350' },
+    'iron': { min: 10, max: 300, normalLow: 60, normalHigh: 170, icon: 'flask', iconColor: '#8D6E63' },
+    'ferritin': { min: 5, max: 500, normalLow: 20, normalHigh: 200, icon: 'flask', iconColor: '#8D6E63' },
+    'vitamin d': { min: 5, max: 100, normalLow: 20, normalHigh: 50, icon: 'sunny', iconColor: '#FFA726' },
+    'vitamin b12': { min: 100, max: 1000, normalLow: 200, normalHigh: 900, icon: 'flask', iconColor: '#EF5350' },
+    'crp': { min: 0, max: 20, normalLow: 0, normalHigh: 3, icon: 'flask', iconColor: '#FF7043' },
 };
 
 // ─── Fuzzy matcher: finds ref range even for names like "Serum Creatinine" ──
@@ -229,6 +230,14 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
     high: { bg: '#B71C1C', text: '#EF9A9A' },
 };
 
+// ─── Fill color based on value position ───────────────────────────────
+function getFillColors(value: number, normalLow: number, normalHigh: number): [string, string] {
+    if (value < normalLow) return ['rgba(255,152,0,0.9)', 'rgba(255,183,77,0.7)'];         // orange (low)
+    if (value > normalHigh * 1.1) return ['rgba(244,67,54,0.9)', 'rgba(239,154,154,0.7)']; // red (high)
+    if (value > normalHigh) return ['rgba(255,193,7,0.9)', 'rgba(255,224,130,0.7)'];       // amber (borderline)
+    return ['rgba(70,241,197,0.85)', 'rgba(0,184,148,0.65)'];                               // green (normal)
+}
+
 // ─── TRI-ZONE PROGRESS BAR ─────────────────────────────────────────
 const ZonedProgressBar: React.FC<{
     value: number; min: number; max: number;
@@ -240,6 +249,7 @@ const ZonedProgressBar: React.FC<{
     const normW = ((normalHigh - normalLow) / totalRange) * 100;
     const highW = ((max - normalHigh) / totalRange) * 100;
     const fill = Math.max(0, Math.min(100, ((value - min) / totalRange) * 100));
+    const fillColors = getFillColors(value, normalLow, normalHigh);
 
     return (
         <View style={{ marginTop: 14 }}>
@@ -248,10 +258,8 @@ const ZonedProgressBar: React.FC<{
                 <View style={[zs.zoneNorm, { width: `${normW}%` }]} />
                 <View style={[zs.zoneHigh, { width: `${highW}%` }]} />
                 <View style={[zs.fill, { width: `${fill}%` }]}>
-                    <LinearGradient
-                        colors={['rgba(0,212,170,0.85)', 'rgba(0,184,148,0.65)']}
-                        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                        style={{ flex: 1, borderRadius: 10 }}
+                    <View
+                        style={{ flex: 1, borderRadius: 10, backgroundColor: fillColors[0] }}
                     />
                 </View>
                 <View style={[zs.dot, { left: `${fill}%` }]} />
@@ -274,6 +282,371 @@ const zs = StyleSheet.create({
     },
     label: { fontSize: 12, color: theme.colors.textMuted, marginTop: 8, letterSpacing: 0.2 },
 });
+
+// ─── LAB TREND CHART (SVG-based, compact) ────────────────────────────
+interface LabHistoryPoint { date: string; value: number; unit: string }
+type LabHistory = Record<string, LabHistoryPoint[]>;
+
+const LabTrendChart: React.FC<{ history: LabHistory; tests: string[] }> = ({ history, tests }) => {
+    const [selectedTest, setSelectedTest] = useState<string>(tests[0] || '');
+    const points = history[selectedTest.toLowerCase()] || [];
+    const reportCount = Object.values(history).reduce((max, arr) => Math.max(max, arr.length), 0);
+
+    if (tests.length === 0) return null;
+
+    // ── Chart dimensions ──
+    const TOTAL_W = SCREEN_WIDTH - 72;   // container padding 20*2 + outer margin 16*2
+    const TOTAL_H = 170;
+    const PAD = { top: 24, bottom: 28, left: 36, right: 10 };
+    const W = TOTAL_W - PAD.left - PAD.right;
+    const H = TOTAL_H - PAD.top - PAD.bottom;
+
+    const ref = findRefRange(selectedTest);
+    const values = points.map(p => p.value);
+    let dMin = values.length ? Math.min(...values) : 0;
+    let dMax = values.length ? Math.max(...values) : 1;
+    if (ref) { dMin = Math.min(dMin, ref.normalLow); dMax = Math.max(dMax, ref.normalHigh); }
+    const pad = (dMax - dMin) * 0.15 || 0.5;
+    dMin -= pad; dMax += pad;
+    const range = dMax - dMin || 1;
+
+    const toX = (i: number) => PAD.left + (points.length > 1 ? (i / (points.length - 1)) * W : W / 2);
+    const toY = (v: number) => PAD.top + H - ((v - dMin) / range) * H;
+
+    const fmtTick = (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v >= 100 ? Math.round(v).toString() : Number(v.toFixed(1)).toString();
+    const fmtDate = (ds: string) => {
+        try {
+            const d = new Date(ds);
+            const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            return `${m[d.getMonth()]} ${d.getDate()}`;
+        } catch { return ds.slice(5, 10); }
+    };
+
+    // Y-axis ticks
+    const yTicks = [dMin, dMin + range / 2, dMax];
+
+    // Build SVG path
+    const linePath = points.length >= 2
+        ? points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(p.value).toFixed(1)}`).join(' ')
+        : '';
+
+    // Area fill path
+    const areaPath = points.length >= 2
+        ? linePath + ` L${toX(points.length - 1).toFixed(1)},${(PAD.top + H).toFixed(1)} L${toX(0).toFixed(1)},${(PAD.top + H).toFixed(1)} Z`
+        : '';
+
+    // Trend
+    const firstVal = points.length >= 2 ? points[0].value : 0;
+    const lastVal = points.length >= 2 ? points[points.length - 1].value : 0;
+    const trendPct = firstVal !== 0 ? (((lastVal - firstVal) / firstVal) * 100) : 0;
+    const trendImproved = ref
+        ? Math.abs(lastVal - (ref.normalLow + ref.normalHigh) / 2) < Math.abs(firstVal - (ref.normalLow + ref.normalHigh) / 2)
+        : trendPct < 0;
+    const trendFlat = Math.abs(trendPct) < 0.5;
+
+    return (
+        <View style={trendStyles.container}>
+            <Text style={trendStyles.sectionLabel}>TRENDS</Text>
+            <Text style={trendStyles.title}>Trends – Last {reportCount} Reports</Text>
+
+            {/* Test toggle chips */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                style={{ marginBottom: 12, maxHeight: 40 }}
+                contentContainerStyle={{ paddingHorizontal: 0, gap: 8 }}
+            >
+                {tests.map(t => (
+                    <TouchableOpacity
+                        key={t}
+                        style={[trendStyles.chip, selectedTest === t && trendStyles.chipActive]}
+                        onPress={() => setSelectedTest(t)}
+                    >
+                        <Text style={[trendStyles.chipText, selectedTest === t && trendStyles.chipTextActive]}>
+                            {t}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </ScrollView>
+
+            {/* SVG Chart */}
+            {points.length >= 1 ? (
+                <View style={{ height: TOTAL_H, borderRadius: 10, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.03)' }}>
+                    <Svg width={TOTAL_W} height={TOTAL_H}>
+                        <Defs>
+                            <SvgGrad id="areaFill" x1="0" y1="0" x2="0" y2="1">
+                                <Stop offset="0" stopColor={theme.colors.accent} stopOpacity="0.25" />
+                                <Stop offset="1" stopColor={theme.colors.accent} stopOpacity="0" />
+                            </SvgGrad>
+                        </Defs>
+
+                        {/* Grid lines */}
+                        {yTicks.map((tick, i) => (
+                            <Line key={`g-${i}`}
+                                x1={PAD.left} y1={toY(tick)} x2={PAD.left + W} y2={toY(tick)}
+                                stroke="rgba(255,255,255,0.08)" strokeWidth={1}
+                            />
+                        ))}
+
+                        {/* Y-axis line */}
+                        <Line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + H}
+                            stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+
+                        {/* X-axis line */}
+                        <Line x1={PAD.left} y1={PAD.top + H} x2={PAD.left + W} y2={PAD.top + H}
+                            stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+
+                        {/* Normal range band */}
+                        {ref && (() => {
+                            const nTop = toY(Math.min(ref.normalHigh, dMax));
+                            const nBot = toY(Math.max(ref.normalLow, dMin));
+                            const h = nBot - nTop;
+                            if (h <= 0) return null;
+                            return (
+                                <Rect x={PAD.left} y={nTop} width={W} height={h}
+                                    fill="rgba(76,175,80,0.08)" rx={3} />
+                            );
+                        })()}
+
+                        {/* Area fill */}
+                        {areaPath ? <Path d={areaPath} fill="url(#areaFill)" /> : null}
+
+                        {/* Line */}
+                        {linePath ? (
+                            <Path d={linePath} fill="none" stroke={theme.colors.accent}
+                                strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                        ) : null}
+
+                        {/* Dots */}
+                        {points.map((p, i) => {
+                            const cx = toX(i), cy = toY(p.value);
+                            const dotColor = ref ? getFillColors(p.value, ref.normalLow, ref.normalHigh)[0] : theme.colors.accent;
+                            const isLast = i === points.length - 1;
+                            return (
+                                <React.Fragment key={`dot-${i}`}>
+                                    {isLast && <Circle cx={cx} cy={cy} r={8} fill={dotColor} opacity={0.15} />}
+                                    <Circle cx={cx} cy={cy} r={isLast ? 5 : 4}
+                                        fill={dotColor} stroke={theme.colors.bgCard} strokeWidth={2} />
+                                </React.Fragment>
+                            );
+                        })}
+                    </Svg>
+
+                    {/* Y-axis text labels (RN Text for crisp rendering) */}
+                    {yTicks.map((tick, i) => (
+                        <Text key={`yl-${i}`} style={{
+                            position: 'absolute', left: 0, top: toY(tick) - 7,
+                            width: PAD.left - 4, textAlign: 'right',
+                            fontSize: 10, color: theme.colors.textMuted, fontWeight: '500',
+                        } as any}>{fmtTick(tick)}</Text>
+                    ))}
+
+                    {/* Value labels above dots */}
+                    {points.map((p, i) => {
+                        const x = toX(i), y = toY(p.value);
+                        const dotColor = ref ? getFillColors(p.value, ref.normalLow, ref.normalHigh)[0] : theme.colors.accent;
+                        const isLast = i === points.length - 1;
+                        return (
+                            <View key={`vl-${i}`} style={{
+                                position: 'absolute', left: x - 22, top: Math.max(2, y - 22),
+                                width: 44, alignItems: 'center',
+                            }}>
+                                <View style={{
+                                    backgroundColor: isLast ? dotColor + '30' : 'rgba(255,255,255,0.08)',
+                                    borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1,
+                                }}>
+                                    <Text style={{
+                                        fontSize: 10, fontWeight: '700',
+                                        color: isLast ? dotColor : theme.colors.text, textAlign: 'center',
+                                    } as any}>{p.value}</Text>
+                                </View>
+                            </View>
+                        );
+                    })}
+
+                    {/* X-axis date labels */}
+                    {points.map((p, i) => (
+                        <Text key={`xd-${i}`} style={{
+                            position: 'absolute', left: toX(i) - 24, top: PAD.top + H + 6,
+                            width: 48, textAlign: 'center',
+                            fontSize: 9, color: theme.colors.textMuted,
+                            fontWeight: i === points.length - 1 ? '600' : '400',
+                        } as any}>{fmtDate(p.date)}</Text>
+                    ))}
+
+                    {/* Trend badge */}
+                    {points.length >= 2 && !trendFlat && (
+                        <View style={{
+                            position: 'absolute', top: 4, right: 4,
+                            flexDirection: 'row', alignItems: 'center',
+                            backgroundColor: trendImproved ? 'rgba(76,175,80,0.12)' : 'rgba(239,83,80,0.12)',
+                            paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+                        }}>
+                            <Ionicons name={trendImproved ? 'trending-up' : 'trending-down'}
+                                size={12} color={trendImproved ? '#4CAF50' : '#EF5350'} />
+                            <Text style={{
+                                fontSize: 10, fontWeight: '700', marginLeft: 3,
+                                color: trendImproved ? '#4CAF50' : '#EF5350',
+                            } as any}>
+                                {trendImproved ? 'Improved' : 'Declined'}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+            ) : (
+                <View style={{ height: 50, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>
+                        No history data for this test.
+                    </Text>
+                </View>
+            )}
+        </View>
+    );
+};
+
+const trendStyles = StyleSheet.create({
+    container: {
+        backgroundColor: theme.colors.bgCard, borderRadius: theme.borderRadius.m, padding: 16, marginBottom: 16,
+        ...theme.shadow.card,
+    },
+    sectionLabel: {
+        fontSize: 11, fontWeight: '600', color: theme.colors.textMuted,
+        letterSpacing: 1.5, marginBottom: 4,
+    } as any,
+    title: { fontSize: 17, fontWeight: '800', color: theme.colors.text, marginBottom: 12 } as any,
+    chip: {
+        paddingHorizontal: 14, paddingVertical: 7, borderRadius: 16,
+        backgroundColor: 'rgba(255,255,255,0.06)',
+    },
+    chipActive: { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
+    chipText: { fontSize: 12, color: theme.colors.textMuted, fontWeight: '600' } as any,
+    chipTextActive: { color: '#fff' },
+});
+
+// ─── MINI SPARKLINE (SVG-based, inline in each lab card) ─────────────
+const SPARK_H = 110;
+
+const MiniSparkline: React.FC<{ points: LabHistoryPoint[]; testName: string }> = ({ points, testName }) => {
+    if (points.length < 2) return null;
+
+    const ref = findRefRange(testName);
+    const values = points.map(p => p.value);
+    let dMin = Math.min(...values);
+    let dMax = Math.max(...values);
+    if (ref) { dMin = Math.min(dMin, ref.normalLow); dMax = Math.max(dMax, ref.normalHigh); }
+    const pad = (dMax - dMin) * 0.15 || 0.5;
+    dMin -= pad; dMax += pad;
+    const range = dMax - dMin || 1;
+
+    const TOTAL_W = SCREEN_WIDTH - 100;  // card padding
+    const PAD = { top: 14, bottom: 20, left: 32, right: 8 };
+    const W = TOTAL_W - PAD.left - PAD.right;
+    const H = SPARK_H - PAD.top - PAD.bottom;
+
+    const toX = (i: number) => PAD.left + (i / (points.length - 1)) * W;
+    const toY = (v: number) => PAD.top + H - ((v - dMin) / range) * H;
+
+    const fmtTick = (v: number) => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : v >= 100 ? Math.round(v).toString() : v.toFixed(1);
+
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i).toFixed(1)},${toY(p.value).toFixed(1)}`).join(' ');
+    const yTicks = [dMin, dMin + range / 2, dMax];
+
+    const firstVal = points[0].value;
+    const lastVal = points[points.length - 1].value;
+    const trendPct = firstVal !== 0 ? (((lastVal - firstVal) / firstVal) * 100) : 0;
+    const trendUp = trendPct > 0;
+    const trendFlat = Math.abs(trendPct) < 0.5;
+
+    return (
+        <View style={{ marginTop: 10, height: SPARK_H, borderRadius: 12, overflow: 'hidden' }}>
+            <View
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 12, backgroundColor: 'rgba(0,201,167,0.03)' }}
+            />
+
+            <Svg width={TOTAL_W} height={SPARK_H}>
+                {/* Grid lines */}
+                {yTicks.map((tick, i) => (
+                    <Line key={`sg-${i}`}
+                        x1={PAD.left} y1={toY(tick)} x2={PAD.left + W} y2={toY(tick)}
+                        stroke="rgba(255,255,255,0.06)" strokeWidth={1} />
+                ))}
+
+                {/* Axes */}
+                <Line x1={PAD.left} y1={PAD.top} x2={PAD.left} y2={PAD.top + H}
+                    stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
+                <Line x1={PAD.left} y1={PAD.top + H} x2={PAD.left + W} y2={PAD.top + H}
+                    stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
+
+                {/* Normal range */}
+                {ref && (() => {
+                    const nTop = toY(Math.min(ref.normalHigh, dMax));
+                    const nBot = toY(Math.max(ref.normalLow, dMin));
+                    const h = nBot - nTop;
+                    if (h <= 0) return null;
+                    return <Rect x={PAD.left} y={nTop} width={W} height={h} fill="rgba(76,175,80,0.08)" rx={3} />;
+                })()}
+
+                {/* Line */}
+                <Path d={linePath} fill="none" stroke={theme.colors.accent}
+                    strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" opacity={0.6} />
+
+                {/* Dots */}
+                {points.map((p, i) => {
+                    const cx = toX(i), cy = toY(p.value);
+                    const dotColor = ref ? getFillColors(p.value, ref.normalLow, ref.normalHigh)[0] : theme.colors.accent;
+                    const isLast = i === points.length - 1;
+                    return (
+                        <Circle key={`sd-${i}`} cx={cx} cy={cy} r={isLast ? 4 : 3}
+                            fill={dotColor} stroke={theme.colors.bgCard} strokeWidth={1.5} />
+                    );
+                })}
+            </Svg>
+
+            {/* Y-axis labels */}
+            {yTicks.map((tick, i) => (
+                <Text key={`syl-${i}`} style={{
+                    position: 'absolute', left: 2, top: toY(tick) - 6,
+                    width: PAD.left - 4, textAlign: 'right',
+                    fontSize: 9, color: theme.colors.textMuted, fontWeight: '500',
+                } as any}>{fmtTick(tick)}</Text>
+            ))}
+
+            {/* X-axis date labels */}
+            {points.map((p, i) => {
+                const x = toX(i);
+                let dateLabel = '';
+                try {
+                    const d = new Date(p.date);
+                    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    dateLabel = `${months[d.getMonth()]} ${d.getDate()}`;
+                } catch { dateLabel = (p.date || '').slice(5, 10); }
+                return (
+                    <Text key={`sxd-${i}`} style={{
+                        position: 'absolute', left: x - 20, top: PAD.top + H + 4,
+                        width: 40, textAlign: 'center',
+                        fontSize: 8, color: theme.colors.textMuted,
+                        fontWeight: i === points.length - 1 ? '600' : '400',
+                    } as any}>{dateLabel}</Text>
+                );
+            })}
+
+            {/* Trend badge */}
+            {!trendFlat && (
+                <View style={{
+                    position: 'absolute', top: 2, right: 4,
+                    flexDirection: 'row', alignItems: 'center',
+                    backgroundColor: trendUp ? 'rgba(239,83,80,0.12)' : 'rgba(76,175,80,0.12)',
+                    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8,
+                }}>
+                    <Ionicons name={trendUp ? 'arrow-up' : 'arrow-down'} size={9} color={trendUp ? '#EF5350' : '#4CAF50'} />
+                    <Text style={{ fontSize: 9, fontWeight: '700', marginLeft: 2, color: trendUp ? '#EF5350' : '#4CAF50' } as any}>
+                        {Math.abs(trendPct).toFixed(1)}%
+                    </Text>
+                </View>
+            )}
+        </View>
+    );
+};
+
+
 
 // ─── LAB RESULT CARD ────────────────────────────────────────────────
 const LabCard: React.FC<{ lab: LabResult; onInfo: (name: string) => void }> = ({ lab, onInfo }) => {
@@ -330,10 +703,8 @@ const LabCard: React.FC<{ lab: LabResult; onInfo: (name: string) => void }> = ({
             {hasNum && !hasRef && (
                 <View style={{ marginTop: 14 }}>
                     <View style={{ height: 16, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
-                        <LinearGradient
-                            colors={['rgba(149,117,205,0.8)', 'rgba(126,87,194,0.5)']}
-                            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                            style={{ width: `${genericFill}%`, height: '100%', borderRadius: 8 }}
+                        <View
+                            style={{ width: `${genericFill}%` as any, height: '100%', borderRadius: 8, backgroundColor: 'rgba(149,117,205,0.7)' }}
                         />
                     </View>
                     <Text style={{ fontSize: 12, color: theme.colors.textMuted, marginTop: 6 }}>
@@ -353,8 +724,8 @@ const LabCard: React.FC<{ lab: LabResult; onInfo: (name: string) => void }> = ({
 
 const cs = StyleSheet.create({
     card: {
-        backgroundColor: theme.colors.bgCard, borderRadius: 20, padding: 20, marginBottom: 16,
-        borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.card,
+        backgroundColor: theme.colors.bgCard, borderRadius: theme.borderRadius.m, padding: 20, marginBottom: 16,
+        ...theme.shadow.card,
     },
     row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     left: { flexDirection: 'row', alignItems: 'center', flex: 1 },
@@ -365,8 +736,8 @@ const cs = StyleSheet.create({
     unit: { fontSize: 16, fontWeight: '500', color: theme.colors.textMuted } as any,
     pill: { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 14, marginTop: 14 },
     pillT: { fontSize: 13, fontWeight: '700', letterSpacing: 0.3 } as any,
-    loincBadge: {
-        backgroundColor: 'rgba(0,212,170,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
+    valueBadge: {
+        backgroundColor: 'rgba(70,241,197,0.15)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8,
     },
     loincText: { fontSize: 10, fontWeight: '700', color: theme.colors.accent, letterSpacing: 0.5 } as any,
 });
@@ -398,8 +769,8 @@ const InfoRow: React.FC<{ label: string; value: string | null | undefined }> = (
 
 const infoStyles = StyleSheet.create({
     card: {
-        backgroundColor: theme.colors.bgCard, borderRadius: 20, padding: 20, marginBottom: 16,
-        borderWidth: 1, borderColor: theme.colors.border, ...theme.shadow.card,
+        backgroundColor: theme.colors.bgCard, borderRadius: theme.borderRadius.m, padding: 20, marginBottom: 16,
+        ...theme.shadow.card,
     },
     header: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
     iconCircle: { width: 34, height: 34, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
@@ -421,6 +792,8 @@ const ReportDetailScreen = ({ navigation, route }: any) => {
     const [data, setData] = useState<OntologyData | null>(null);
     const [infoVisible, setInfoVisible] = useState(false);
     const [infoName, setInfoName] = useState('');
+    const [labHistory, setLabHistory] = useState<LabHistory>({});
+    const [labHistoryTests, setLabHistoryTests] = useState<string[]>([]);
 
     const showInfo = useCallback((name: string) => {
         setInfoName(name);
@@ -530,6 +903,39 @@ const ReportDetailScreen = ({ navigation, route }: any) => {
 
     useEffect(() => { fetchAnalysis(); }, [fetchAnalysis]);
 
+    // Fetch lab history for trend chart
+    useEffect(() => {
+        (async () => {
+            try {
+                const userPhone = (await AsyncStorage.getItem('user_phone')) || '';
+                console.log('LabHistory: user_phone =', JSON.stringify(userPhone));
+                if (!userPhone) {
+                    console.log('LabHistory: no user_phone, skipping');
+                    return;
+                }
+                const url = `${BASE_URL}/api/lab-history/${userPhone}`;
+                console.log('LabHistory: fetching', url);
+                const res = await fetch(url);
+                console.log('LabHistory: response status =', res.status);
+                const json = await res.json();
+                console.log('LabHistory: keys =', Object.keys(json), 'history keys =', json.history ? Object.keys(json.history) : 'none');
+                if (json.status === 'success' && json.history) {
+                    setLabHistory(json.history);
+                    // Build unique test name list (only tests with 1+ data points)
+                    const names = Object.keys(json.history).filter(k => json.history[k].length >= 1);
+                    // Capitalize first letter of each word
+                    const display = names.map(n => n.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+                    setLabHistoryTests(display);
+                    console.log('LabHistory: loaded', names.length, 'tests:', names.slice(0, 5));
+                } else {
+                    console.log('LabHistory: bad response:', JSON.stringify(json).slice(0, 200));
+                }
+            } catch (e: any) {
+                console.log('LabHistory: FETCH ERROR:', e?.message || e);
+            }
+        })();
+    }, []);
+
     const onRefresh = useCallback(() => {
         setRefreshing(true);
         fetchAnalysis();
@@ -628,6 +1034,11 @@ const ReportDetailScreen = ({ navigation, route }: any) => {
                             </InfoCard>
                         )}
 
+                        {/* ── Lab Trend Chart ── */}
+                        {labHistoryTests.length > 0 && (
+                            <LabTrendChart history={labHistory} tests={labHistoryTests} />
+                        )}
+
                         {/* ── Lab Results (grouped by category) ── */}
                         {Object.entries(groupedLabs).map(([category, labs]) => (
                             <View key={category}>
@@ -710,7 +1121,6 @@ const ReportDetailScreen = ({ navigation, route }: any) => {
                         backgroundColor: theme.colors.bgCard,
                         borderTopLeftRadius: 28, borderTopRightRadius: 28,
                         padding: 24, paddingBottom: 40,
-                        borderWidth: 1, borderColor: theme.colors.border,
                     }}>
                         <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.textMuted, alignSelf: 'center', marginBottom: 20, opacity: 0.4 }} />
                         <Text style={{ fontSize: 20, fontWeight: '800', color: theme.colors.text, marginBottom: 16 } as any}>
@@ -765,12 +1175,10 @@ const hdr = StyleSheet.create({
     bar: {
         flexDirection: 'row', alignItems: 'center',
         paddingTop: 54, paddingHorizontal: 16, paddingBottom: 14,
-        borderBottomWidth: 1, borderBottomColor: theme.colors.border,
     },
     back: {
         width: 40, height: 40, borderRadius: 20,
-        backgroundColor: theme.colors.glassLight, justifyContent: 'center', alignItems: 'center',
-        borderWidth: 1, borderColor: theme.colors.border,
+        backgroundColor: theme.colors.bgCard, justifyContent: 'center', alignItems: 'center',
     },
     title: {
         flex: 1, textAlign: 'center',

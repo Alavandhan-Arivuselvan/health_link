@@ -22,15 +22,14 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import GradientBackground from '../../components/GradientBackground';
 import { theme } from '../../theme';
 import { BASE_URL } from '../../config/host';
 
 // ─── Color palette for wellness cards ───────────────────────────
 const COLORS = {
-  teal: '#0ea5e9',
-  tealLight: 'rgba(14, 165, 233, 0.15)',
+  teal: '#00C9A7',
+  tealLight: 'rgba(0, 201, 167, 0.12)',
   purple: '#8b5cf6',
   purpleLight: 'rgba(139, 92, 246, 0.15)',
   amber: '#f59e0b',
@@ -39,8 +38,8 @@ const COLORS = {
   greenLight: 'rgba(34, 197, 94, 0.15)',
   red: '#ef4444',
   redLight: 'rgba(239, 68, 68, 0.15)',
-  cardBg: 'rgba(26, 35, 50, 0.9)',
-  cardBorder: 'rgba(255, 255, 255, 0.08)',
+  cardBg: '#161B22',
+  cardBorder: 'rgba(48, 54, 61, 0.4)',
 };
 
 // ─── Types matching backend response ────────────────────────────
@@ -280,12 +279,11 @@ const StatsScreen = () => {
         <ScrollView contentContainerStyle={styles.centeredContent} showsVerticalScrollIndicator={false}>
           {/* Decorative icon */}
           <View style={styles.connectIconWrapper}>
-            <LinearGradient
-              colors={[COLORS.tealLight, COLORS.purpleLight]}
+            <View
               style={styles.connectIconGradient}
             >
               <MaterialCommunityIcons name="watch" size={48} color={COLORS.teal} />
-            </LinearGradient>
+            </View>
           </View>
 
           <Text style={styles.connectTitle}>Connect Your Fitbit</Text>
@@ -309,10 +307,7 @@ const StatsScreen = () => {
 
           {/* Sync button — triggers backend to fetch from Fitbit API */}
           <TouchableOpacity onPress={handleRefreshFromFitbit} activeOpacity={0.85} disabled={syncing}>
-            <LinearGradient
-              colors={['#0ea5e9', '#8b5cf6']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+            <View
               style={styles.connectButton}
             >
               {syncing ? (
@@ -323,7 +318,7 @@ const StatsScreen = () => {
                   <Text style={styles.connectButtonText}>Sync Fitbit Data</Text>
                 </>
               )}
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
 
           {error && <Text style={styles.errorText}>{error}</Text>}
@@ -612,17 +607,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     paddingHorizontal: 40,
-    borderRadius: 16,
+    borderRadius: 999,
     minWidth: 220,
     minHeight: 54,
-    shadowColor: '#0ea5e9',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
+    backgroundColor: COLORS.teal,
   },
   connectButtonText: {
-    color: '#fff',
+    color: '#0D1117',
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: 0.3,
@@ -686,11 +677,9 @@ const styles = StyleSheet.create({
   // ── Insight Card ──────────────────────────────────────────────
   insightCard: {
     backgroundColor: COLORS.cardBg,
-    borderRadius: 20,
+    borderRadius: theme.borderRadius.m,
     padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
   },
   insightHeader: {
     flexDirection: 'row',

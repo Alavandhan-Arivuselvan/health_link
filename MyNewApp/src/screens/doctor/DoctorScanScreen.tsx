@@ -166,8 +166,8 @@ const styles = StyleSheet.create({
     centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
     iconCircle: {
         width: 80, height: 80, borderRadius: 40,
-        backgroundColor: theme.colors.glassLight, borderWidth: 1.5,
-        borderColor: theme.colors.border, justifyContent: 'center',
+        backgroundColor: 'rgba(0,201,167,0.1)',
+        justifyContent: 'center',
         alignItems: 'center', marginBottom: 20,
     },
     title: { ...theme.typography.h2, marginBottom: 8 },
@@ -186,8 +186,9 @@ const styles = StyleSheet.create({
     } as any,
     infoCard: {
         backgroundColor: theme.colors.bgCard, padding: 20,
-        borderRadius: theme.borderRadius.l, borderWidth: 1,
-        borderColor: theme.colors.border, width: '100%', gap: 14,
+        borderRadius: theme.borderRadius.m,
+        width: '100%', gap: 14,
+        ...theme.shadow.card,
     },
     infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
     infoText: { color: theme.colors.textMuted, fontSize: 14, flex: 1 },
@@ -197,7 +198,7 @@ const styles = StyleSheet.create({
     },
     backBtn: {
         width: 36, height: 36, borderRadius: 18,
-        backgroundColor: theme.colors.glassLight, justifyContent: 'center', alignItems: 'center',
+        backgroundColor: theme.colors.bgCard, justifyContent: 'center', alignItems: 'center',
     },
     headerText: { ...theme.typography.h3 },
     camSubtitle: {
@@ -206,7 +207,7 @@ const styles = StyleSheet.create({
     },
     cameraWrapper: {
         flex: 1, marginHorizontal: 20, borderRadius: 20, overflow: 'hidden',
-        borderWidth: 1, borderColor: theme.colors.border, marginBottom: 12,
+        marginBottom: 12,
     },
     camera: { flex: 1 },
     scanOverlay: {
@@ -227,7 +228,7 @@ const styles = StyleSheet.create({
     cancelButton: {
         alignItems: 'center', paddingVertical: 14, marginHorizontal: 20,
         marginBottom: 20, borderRadius: theme.borderRadius.m,
-        backgroundColor: theme.colors.bgCard, borderWidth: 1, borderColor: theme.colors.border,
+        backgroundColor: theme.colors.bgCard,
     },
     cancelText: { color: theme.colors.textMuted, fontWeight: '600', fontSize: 15 } as any,
 });

@@ -35,7 +35,7 @@ const ChatScreen = () => {
                 {/* Header */}
                 <View style={styles.header}>
                     <View style={styles.headerIcon}>
-                        <Ionicons name="chatbubble-ellipses" size={20} color={theme.colors.accent} />
+                        <Ionicons name="chatbubble-ellipses" size={18} color={theme.colors.accent} />
                     </View>
                     <View>
                         <Text style={styles.headerTitle}>Health Assistant</Text>
@@ -71,7 +71,7 @@ const ChatScreen = () => {
                         onSubmitEditing={sendMessage}
                     />
                     <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-                        <Ionicons name="send" size={20} color={theme.colors.bgDark} />
+                        <Ionicons name="send" size={18} color={theme.colors.bgDark} />
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
@@ -88,17 +88,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 20,
         paddingTop: 48,
-        paddingBottom: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.colors.border,
+        paddingBottom: 12,
     },
     headerIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: theme.colors.glassLight,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: 'rgba(0,201,167,0.1)',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
@@ -116,7 +112,7 @@ const styles = StyleSheet.create({
     },
     messageBubble: {
         padding: 14,
-        borderRadius: theme.borderRadius.l,
+        borderRadius: theme.borderRadius.m,
         marginVertical: 4,
         maxWidth: '82%',
     },
@@ -128,8 +124,6 @@ const styles = StyleSheet.create({
     botBubble: {
         alignSelf: 'flex-start',
         backgroundColor: theme.colors.bgCard,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
         borderBottomLeftRadius: 4,
     },
     messageText: {
@@ -138,7 +132,7 @@ const styles = StyleSheet.create({
         lineHeight: 21,
     },
     userMessageText: {
-        color: '#0B1120',
+        color: theme.colors.bgDark,
         fontWeight: '500',
     } as any,
     inputContainer: {
@@ -146,15 +140,11 @@ const styles = StyleSheet.create({
         padding: theme.spacing.m,
         paddingBottom: 24,
         backgroundColor: theme.colors.bgCard,
-        borderTopWidth: 1,
-        borderTopColor: theme.colors.border,
         alignItems: 'center',
     },
     input: {
         flex: 1,
         height: 44,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
         borderRadius: 22,
         paddingHorizontal: 18,
         backgroundColor: theme.colors.bgDark,

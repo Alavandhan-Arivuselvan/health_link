@@ -157,11 +157,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     card: {
-        backgroundColor: theme.colors.glassBg,
+        backgroundColor: theme.colors.bgCard,
         padding: theme.spacing.m,
-        borderRadius: theme.borderRadius.xl,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.m,
         maxHeight: '92%',
         ...theme.shadow.card,
     },
@@ -176,9 +174,7 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: theme.colors.glassLight,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
+        backgroundColor: 'rgba(0,201,167,0.1)',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: theme.spacing.s,
@@ -226,7 +222,7 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     } as any,
     genderTextSelected: {
-        color: '#0B1120',
+        color: theme.colors.bgDark,
         fontWeight: '700',
     } as any,
 });

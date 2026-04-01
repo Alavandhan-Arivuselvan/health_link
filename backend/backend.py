@@ -775,7 +775,7 @@ app.add_middleware(
 # Twilio Configuration
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_PHONE_NUMBER = "+16187013270"
+TWILIO_PHONE_NUMBER = "+19786919225"
 
 if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
     twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
@@ -1326,28 +1326,44 @@ def get_lab_history(user_phone: str):
 
     history: dict[str, list] = {}
 
-    for report in result.data:
+    print(f"[lab-history] Found {len(result.data)} processed reports for {user_phone}")
+
+    for idx, report in enumerate(result.data):
         report_date = report.get("uploaded_at", "")
 
         # Try ontology lab results first
         ontology = report.get("ontology_data") or {}
         lab_results = ontology.get("lab_results") or []
 
+        print(f"[lab-history] Report {idx}: ontology keys={list(ontology.keys()) if ontology else 'None'}, ontology labs={len(lab_results)}")
+
         # Fallback to extracted_data if ontology has nothing
         if not lab_results:
             extracted = report.get("extracted_data") or {}
             clinical = extracted.get("clinical_data") or {}
             lab_results = clinical.get("lab_reports") or []
+            print(f"[lab-history] Report {idx}: extracted keys={list(extracted.keys()) if extracted else 'None'}, clinical keys={list(clinical.keys()) if clinical else 'None'}, fallback labs={len(lab_results)}")
+            if lab_results:
+                print(f"[lab-history] Report {idx}: first lab sample={lab_results[0]}")
 
         for lab in lab_results:
             name = (lab.get("test_name") or lab.get("name") or "").strip()
             if not name:
                 continue
-            raw_value = lab.get("value") or lab.get("result") or ""
-            try:
-                numeric_value = float(str(raw_value))
-            except (ValueError, TypeError):
-                continue  # skip non-numeric
+            raw_value = str(lab.get("value") or lab.get("result") or "").strip()
+
+            # Extract numeric part — values may contain units like "126 mg/dL" or "6.4 %"
+            import re
+            num_match = re.match(r"^([+-]?\d+\.?\d*)", raw_value)
+            if not num_match:
+                print(f"[lab-history] Report {idx}: no number found in '{name}' = '{raw_value}'")
+                continue
+            numeric_value = float(num_match.group(1))
+
+            # Extract unit: use stored unit, or parse from value string
+            unit = lab.get("unit") or ""
+            if not unit and len(raw_value) > len(num_match.group(0)):
+                unit = raw_value[len(num_match.group(0)):].strip()
 
             key = name.lower()
             if key not in history:
@@ -1355,9 +1371,10 @@ def get_lab_history(user_phone: str):
             history[key].append({
                 "date": report_date,
                 "value": numeric_value,
-                "unit": lab.get("unit") or "",
+                "unit": unit,
             })
 
+    print(f"[lab-history] Final: {len(history)} unique tests")
     return {"status": "success", "history": history}
 
 
@@ -1453,7 +1470,6 @@ def api_graph_data():
         raise HTTPException(status_code=503, detail="Neo4j is not connected")
     data = get_graph_data()
     return data
-
 
 @app.get("/api/graph-html", response_class=HTMLResponse)
 def api_graph_html():
