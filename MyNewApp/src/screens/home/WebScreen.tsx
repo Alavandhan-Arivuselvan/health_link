@@ -1,18 +1,46 @@
 
-import React from 'react';
-import { StyleSheet, Platform, View, Text } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { StyleSheet, Platform, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { BASE_URL } from '../../config/host';
 import { theme } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 
-const GRAPH_URL = `${BASE_URL}/graph`;
+const GRAPH_URL = `${BASE_URL}/api/graph-html`;
 
 const WebScreen = () => {
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const webViewRef = useRef<any>(null);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setRefreshKey(prev => prev + 1);
+    setTimeout(() => setRefreshing(false), 1500);
+  };
+
+  const RefreshButton = () => (
+    <TouchableOpacity
+      style={styles.refreshBtn}
+      onPress={handleRefresh}
+      activeOpacity={0.7}
+    >
+      {refreshing ? (
+        <ActivityIndicator size="small" color="#fff" />
+      ) : (
+        <Ionicons name="refresh" size={20} color="#fff" />
+      )}
+      <Text style={styles.refreshText}>
+        {refreshing ? 'Loading...' : 'Refresh Graph'}
+      </Text>
+    </TouchableOpacity>
+  );
+
   if (Platform.OS === 'web') {
     return (
       <View style={styles.container}>
         <iframe
-          src={GRAPH_URL}
+          key={refreshKey}
+          src={`${GRAPH_URL}?t=${refreshKey}`}
           style={{
             position: 'absolute' as const,
             top: 0, left: 0, right: 0, bottom: 0,
@@ -20,6 +48,7 @@ const WebScreen = () => {
           }}
           title="HealthLink Knowledge Graph"
         />
+        <RefreshButton />
       </View>
     );
   }
@@ -27,12 +56,17 @@ const WebScreen = () => {
   try {
     const { WebView } = require('react-native-webview');
     return (
-      <WebView
-        source={{ uri: GRAPH_URL }}
-        style={styles.container}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-      />
+      <View style={styles.container}>
+        <WebView
+          ref={webViewRef}
+          key={refreshKey}
+          source={{ uri: `${GRAPH_URL}?t=${refreshKey}` }}
+          style={{ flex: 1 }}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+        />
+        <RefreshButton />
+      </View>
     );
   } catch (e) {
     return (
@@ -58,6 +92,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.bgDark,
   },
+  refreshBtn: {
+    position: 'absolute',
+    bottom: 24,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.accent,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 28,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  refreshText: {
+    color: theme.colors.bgDark,
+    fontSize: 14,
+    fontWeight: '600',
+  } as any,
   fallback: {
     flex: 1,
     justifyContent: 'center',
@@ -68,10 +124,8 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 72,
     height: 72,
-    borderRadius: 36,
-    backgroundColor: theme.colors.glassLight,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderRadius: 24,
+    backgroundColor: 'rgba(0,201,167,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: theme.spacing.m,
@@ -92,8 +146,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: theme.borderRadius.m,
     width: '100%',
-    borderWidth: 1,
-    borderColor: theme.colors.border,
   },
   urlLabel: {
     color: theme.colors.textMuted,

@@ -5,6 +5,7 @@ import { NavigationContainer, NavigationIndependentTree, DefaultTheme } from '@r
 import AuthStack from './AuthStack';
 import AppTabs from './AppTabs';
 import DoctorScreen from '../screens/doctor/DoctorScreen';
+import DoctorPatientView from '../screens/doctor/DoctorPatientView';
 import { Button } from 'react-native';
 import { theme } from '../theme';
 
@@ -61,6 +62,11 @@ const RootNavigator = () => {
                             title: 'Consult Doctor',
                             headerStyle: darkHeaderStyle,
                         }}
+                    />
+                    <Stack.Screen
+                        name="DoctorPatientView"
+                        component={DoctorPatientView}
+                        options={{ headerShown: false }}
                     />
                 </Stack.Navigator>
             </NavigationContainer>

@@ -1,6 +1,44 @@
-# HealthLink
+# 🏥 HealthLink
 
-A React Native (Expo) health management app with a FastAPI backend, Supabase database, and AI-powered chat.
+A full-stack health intelligence platform that analyzes medical reports via OCR, builds a **Neo4j Knowledge Graph**, integrates **Fitbit smartwatch** data, and provides an **AI-powered GraphRAG chatbot** — all wrapped in a React Native (Expo) mobile app with a FastAPI backend. Includes a **QR-based doctor access system** with 1-hour temporary sessions.
+
+---
+
+## 🏗️ Architecture
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                     React Native (Expo)                       │
+│                                                               │
+│   Patient App                        Doctor App               │
+│   ─────────                          ──────────               │
+│   Home / Dashboard                   Scan QR (only tab)       │
+│   Chat (GraphRAG AI)                   → Patient Graph View   │
+│   Upload (PDF / Image OCR)             → Patient Chat         │
+│   Visualize (Neo4j Graph)              → 1-hour timer         │
+│   QR Code (share profile)                                     │
+│   Stats (Fitbit)                                              │
+│   Report History                                              │
+└────────────────────────┬──────────────────────────────────────┘
+                         │  REST API
+┌────────────────────────▼──────────────────────────────────────┐
+│                     FastAPI Backend                           │
+│                                                               │
+│   /upload    → OCR + Neo4j KG ingestion                       │
+│   /chat      → GraphRAG chatbot (Neo4j + Gemini LLM)          │
+│   /qr        → QR code generation                             │
+│   /api/doctor/scan         → Create 1hr doctor session        │
+│   /api/doctor/patient-chat → Doctor chat (token-gated)        │
+│   /api/graph-data          → Neo4j graph JSON                 │
+│   /api/graph-html          → Interactive vis.js graph         │
+│   /api/fitbit-insights     → Fitbit analytics & nudges        │
+└──┬──────────┬──────────┬───────────┬──────────────────────────┘
+   │          │          │           │
+   ▼          ▼          ▼           ▼
+MongoDB    Supabase    Neo4j      Fitbit API
+(vectors)  (reports,   (Knowledge  (smartwatch
+            users)      Graph)      data)
+```
 
 ---
 
@@ -8,206 +46,204 @@ A React Native (Expo) health management app with a FastAPI backend, Supabase dat
 
 ```
 health_link/
-├── MyNewApp/          # Expo React Native frontend
-│   ├── src/
-│   │   ├── config/host.ts      # ← Backend API URL lives here
-│   │   ├── screens/            # All app screens
-│   │   ├── components/         # Reusable UI components
-│   │   ├── theme/              # Design tokens & colors
-│   │   └── navigation/         # Tab & stack navigation
-│   ├── eas.json                # EAS Build/Update config
-│   └── app.json                # Expo project config
 │
-└── backend/           # FastAPI Python backend
-    ├── backend.py              # API routes & logic
-    ├── main.py                 # Entry point (uvicorn)
-    ├── .env.local              # Secrets (Supabase, Twilio)
-    └── requirements.txt        # Python dependencies
+├── backend/                           # FastAPI Backend Server
+│   ├── backend.py                     #   Main API (auth, upload, chat, graph, doctor sessions)
+│   ├── utils.py                       #   OCR pipeline, LLM extraction, MongoDB, ML risk model
+│   ├── neo4j_bridge.py                #   Neo4j integration bridge
+│   ├── requirements.txt               #   Python dependencies
+│   ├── .env / .env.local              #   Env vars (Twilio, Supabase, Neo4j, Gemini, MongoDB)
+│   ├── risk_model_multi.pkl           #   ML multi-output risk prediction model
+│   ├── features_list.pkl              #   ML feature names
+│   ├── uploads/                       #   Uploaded medical files
+│   └── doc/                           #   Sample medical documents
+│
+├── MyNewApp/                          # React Native (Expo) Frontend
+│   ├── App.tsx                        #   Entry point
+│   ├── src/
+│   │   ├── config/host.ts             #     Backend BASE_URL
+│   │   ├── theme/index.ts             #     Global theme (dark, glassmorphism)
+│   │   ├── components/                #     GradientBackground, CustomButton, CustomInput
+│   │   │
+│   │   ├── navigation/
+│   │   │   ├── RootNavigator.tsx      #     Root stack (Auth → AppTabs → DoctorPatientView)
+│   │   │   ├── AuthStack.tsx          #     Login / Register / DoctorLogin / DoctorRegister
+│   │   │   ├── AppTabs.tsx            #     Bottom tabs (role-based: patient vs doctor)
+│   │   │   └── DashboardStack.tsx     #     Home → Dashboard → Reports → Fitbit
+│   │   │
+│   │   ├── screens/
+│   │   │   ├── auth/
+│   │   │   │   ├── LoginScreen.tsx        # Phone + OTP login
+│   │   │   │   └── RegisterScreen.tsx     # User registration
+│   │   │   │
+│   │   │   ├── home/
+│   │   │   │   ├── HomeScreen.tsx         # Main hub — service grid + notifications
+│   │   │   │   ├── DashboardScreen.tsx    # Health score, metrics, recent uploads
+│   │   │   │   ├── ChatScreen.tsx         # GraphRAG AI health assistant
+│   │   │   │   ├── IngestScreen.tsx       # Upload medical docs (PDF/image → OCR)
+│   │   │   │   ├── WebScreen.tsx          # Neo4j graph visualization (vis.js)
+│   │   │   │   ├── StatsScreen.tsx        # Fitbit stats (heart rate, sleep, steps)
+│   │   │   │   ├── QRScreen.tsx           # QR code health profile sharing
+│   │   │   │   ├── ReportHistoryScreen    # Uploaded reports list
+│   │   │   │   ├── ReportDetailScreen     # Individual report detail
+│   │   │   │   └── FitbitInsightsScreen   # Fitbit energy, sleep, nudges
+│   │   │   │
+│   │   │   └── doctor/
+│   │   │       ├── DoctorLoginScreen.tsx       # License + phone + OTP login
+│   │   │       ├── DoctorRegisterScreen.tsx    # Doctor registration
+│   │   │       ├── DoctorScanScreen.tsx        # QR scanner (camera) — doctor's only tab
+│   │   │       ├── DoctorPatientView.tsx       # Patient graph + chat (1hr session)
+│   │   │       └── DoctorScreen.tsx            # Doctor portal placeholder
+│   │   │
+│   │   └── services/api.ts            #     API client (auth, reports, chat, doctor)
+│   │
+│   └── package.json
+│
+├── KG/                                # Knowledge Graph Modules
+│   ├── Graph_Schema/                  #   Neo4j schema + ingestion
+│   │   ├── config.py                  #     Gemini + Neo4j credentials
+│   │   ├── graph_db.py                #     Neo4j CRUD (nodes, relationships, trends)
+│   │   ├── ingest.py                  #     Ingestion pipeline (medical, scan, wearable)
+│   │   ├── extractor.py               #     Gemini LLM extraction prompts
+│   │   ├── analysis.py                #     Graph analysis pass
+│   │   ├── run.py                     #     Interactive CLI runner
+│   │   └── test_conn.py               #     Neo4j connection test
+│   │
+│   └── GraphRag/                      #   GraphRAG chatbot engine
+│       ├── graphrag_config.py         #     Gemini + Neo4j config (renamed to avoid collision)
+│       ├── query_engine.py            #     Query classification, entity detection, LLM generation
+│       ├── retriever.py               #     Neo4j graph traversal (local + global retrieval)
+│       ├── context_builder.py         #     Formats graph data as LLM context
+│       ├── Checkin.py                 #     Daily health check-in (5 AI-generated questions)
+│       └── run.py                     #     Interactive CLI runner
+│
+├── ML/                                # Machine Learning Module
+│   ├── train.py                       #     Train multi-output risk model
+│   ├── authorize.py                   #     Fitbit OAuth2 authorization
+│   ├── fetch.py / final_fetch.py      #     Fitbit API data pull
+│   └── risk_model_multi.pkl           #     Trained risk model
+│
+└── doc/                               # Sample medical documents
 ```
 
 ---
 
-## 🚀 Quick Start (Local Dev)
+## 🔑 Key Features
 
-### 1. Backend
+### Patient Side
+- **Medical Report Upload** — PDF/image → OCR → Gemini LLM extraction → Neo4j Knowledge Graph
+- **GraphRAG AI Chat** — ask questions about your health data (backed by Neo4j graph traversal + Gemini)
+- **Knowledge Graph Visualization** — interactive vis.js graph of all medical data
+- **Fitbit Integration** — heart rate, sleep, steps, energy analysis with AI nudges
+- **ML Risk Prediction** — multi-output risk model for heart, obesity, respiratory risks
+- **QR Code Sharing** — share health profile QR for doctor access
+- **Report History** — track all uploaded reports with Supabase
+- **OTP Authentication** — phone + password + Twilio OTP verification
 
+### Doctor Side
+- **QR Scanner** — scan patient's QR code to get temporary access
+- **1-Hour Session** — token-based access with countdown timer, auto-revoked on expiry
+- **Patient Graph** — view patient's Neo4j knowledge graph
+- **Patient Chat** — ask AI about patient's health data (GraphRAG)
+- **OTP Login** — license number + phone + password + OTP
+
+---
+
+## 🔌 API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/register` | User registration |
+| POST | `/login` | Phone + password login |
+| POST | `/send-otp` | Send OTP via Twilio |
+| POST | `/verify-otp` | Verify OTP code |
+| POST | `/doctor/login` | Doctor login (license + password) |
+| POST | `/doctor/register` | Doctor registration |
+| POST | `/upload` | Upload medical file → OCR + Neo4j |
+| POST | `/upload-report` | Upload with Supabase tracking |
+| GET | `/reports/{phone}` | List user reports |
+| GET | `/reports/detail/{id}` | Report detail |
+| POST | `/chat` | GraphRAG AI chat |
+| POST | `/qr` | Generate QR data |
+| GET | `/api/graph-data` | Neo4j graph (JSON) |
+| GET | `/api/graph-html` | Interactive graph visualization |
+| GET | `/api/fitbit-insights` | Fitbit analytics |
+| POST | `/api/doctor/scan` | Create 1hr doctor session (token) |
+| POST | `/api/doctor/patient-graph` | Patient graph (token-gated) |
+| POST | `/api/doctor/patient-chat` | Doctor chat about patient (token-gated) |
+| POST | `/api/doctor/session-status` | Check session validity |
+| POST | `/smartwatch-data` | ML risk analysis |
+
+---
+
+## 🚀 Quick Start
+
+### Backend
 ```bash
 cd backend
 pip install -r requirements.txt
-python main.py
+uvicorn backend:app --host 0.0.0.0 --port 9000 --reload
 ```
 
-Backend runs on `http://localhost:9000`.
-
-### 2. Frontend
-
+### Frontend
 ```bash
 cd MyNewApp
 npm install
-npx expo start --lan
+npm start --host
 ```
 
-Scan the QR code with **Expo Go** (same WiFi network required).
-
----
-
-## 🌐 Tunneling Guide (Share Over the Internet)
-
-You need **two separate tunnels** — one for the backend API, one for the Expo frontend.
-
-| Tunnel | Tool | Port | Purpose |
-|--------|------|------|---------|
-| Backend API | **Cloudflared** | 9000 | Login, chat, upload, QR, etc. |
-| Expo Frontend | **Expo Tunnel** or **EAS Update** | 8081 | Delivers the JS bundle to phones |
-
-### Step 1: Start the Backend
-
+### Knowledge Graph (standalone CLI)
 ```bash
-cd backend
-python main.py
+cd KG/Graph_Schema
+python run.py
 ```
 
-### Step 2: Tunnel the Backend (Cloudflared)
-
-Open a **new terminal**:
-
+### GraphRAG Chatbot (standalone CLI)
 ```bash
-npx -y cloudflared tunnel --url http://localhost:9000
-```
-
-You'll see output like:
-
-```
-Your quick Tunnel has been created! Visit it at:
-https://something-random.trycloudflare.com
-```
-
-**Copy that URL** — you'll need it in the next step.
-
-> ⚡ Cloudflare tunnels are free, no account needed.
-> ⚠️ URL changes every time you restart cloudflared.
-
-### Step 3: Update the Frontend Config
-
-Edit `MyNewApp/src/config/host.ts`:
-
-```typescript
-export const BASE_URL = "https://something-random.trycloudflare.com";
-```
-
-Replace with the URL from Step 2.
-
-### Step 4: Share the Frontend
-
-You have **two options**:
-
----
-
-#### Option A: EAS Update (Recommended for remote friends)
-
-Friends only need **Expo Go** installed. No same-WiFi requirement.
-
-**First-time setup** (already done if you followed earlier):
-```bash
-cd MyNewApp
-npm install -g eas-cli
-npx expo login          # Log into your Expo account
-eas init                 # Link project to EAS
-npx expo install expo-updates
-```
-
-**Publish the app:**
-```bash
-eas update --branch default --message "your update message"
-```
-
-**Share with your friend:**
-1. Friend installs **Expo Go** from Play Store / App Store
-2. Friend opens this link:
-   ```
-   https://expo.dev/@agiless/MyNewApp
-   ```
-3. App loads in Expo Go!
-
-**After making code changes**, re-publish:
-```bash
-eas update --branch default --message "describe changes"
+cd KG/GraphRag
+python run.py
 ```
 
 ---
 
-#### Option B: Expo LAN Mode (Same WiFi only)
+## 🔧 Environment Variables
 
-If your friend is on the **same WiFi network**:
-
-```bash
-cd MyNewApp
-npx expo start --lan
-```
-
-Friend scans the terminal QR code with Expo Go. That's it.
-
----
-
-## 📋 Full Startup Checklist (Remote Sharing)
-
-Run these in **3 separate terminals**:
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Terminal 1: Backend Server                                  │
-│ > cd backend                                                │
-│ > python main.py                                            │
-│                                                             │
-│ Terminal 2: Backend Tunnel (Cloudflared)                     │
-│ > npx -y cloudflared tunnel --url http://localhost:9000      │
-│ → Copy the https://...trycloudflare.com URL                 │
-│ → Paste into MyNewApp/src/config/host.ts                    │
-│                                                             │
-│ Terminal 3: Frontend                                        │
-│ > cd MyNewApp                                               │
-│ > eas update --branch default --message "publish"           │
-│   (for remote friends)                                      │
-│   OR                                                        │
-│ > npx expo start --lan                                      │
-│   (for same-WiFi testing)                                   │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 🔑 Environment Variables
-
-Backend secrets are stored in `backend/.env.local`:
+Create `.env` files in `backend/` and `KG/Graph_Schema/`:
 
 ```env
-TWILIO_SID=your_twilio_sid
-TWILIO_AUTH_TOKEN=your_twilio_auth_token
-TWILIO_PHONE_NUMBER=your_twilio_phone
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your_supabase_anon_key
+# Twilio (OTP)
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_PHONE_NUMBER=...
+
+# Supabase (auth + reports)
+SUPABASE_URL=...
+SUPABASE_KEY=...
+
+# Neo4j (Knowledge Graph)
+NEO4J_URI=...
+NEO4J_USERNAME=...
+NEO4J_PASSWORD=...
+
+# Google Gemini (AI)
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-3-flash-preview
+
+# MongoDB (vectors)
+MONGO_URI=...
 ```
 
 ---
 
-## 🛠 Tech Stack
+## 🧠 Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React Native, Expo SDK 54, Expo Router |
-| Styling | Custom dark theme, Ionicons, LinearGradient |
-| Backend | Python, FastAPI, Uvicorn |
-| Database | Supabase (PostgreSQL) |
-| Auth | bcrypt password hashing, OTP via Twilio |
-| Tunneling | Cloudflared (backend), EAS Update (frontend) |
-
----
-
-## ⚠️ Common Issues
-
-| Problem | Fix |
-|---------|-----|
-| `expo --tunnel` fails with "remote gone away" | Use **EAS Update** or **LAN mode** instead — `@expo/ngrok` has compatibility issues |
-| Friend can't reach API | Make sure cloudflared tunnel is running and `host.ts` has the correct URL |
-| Cloudflared URL changed | Restart cloudflared → copy new URL → update `host.ts` → re-publish with `eas update` |
-| Free ngrok conflicts | Don't use ngrok for backend if Expo tunnel is also using ngrok — use cloudflared instead |
+| Frontend | React Native, Expo, TypeScript |
+| Backend | FastAPI, Python |
+| Database | Neo4j (graph), MongoDB (vectors), Supabase (auth/reports) |
+| AI/ML | Google Gemini, GraphRAG, scikit-learn |
+| OCR | PyMuPDF, pytesseract, pdf2image |
+| Auth | Twilio OTP, bcrypt |
+| Visualization | vis.js (interactive graph) |
+| Wearable | Fitbit Web API |

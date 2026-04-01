@@ -1,104 +1,117 @@
 import os
-
 import json
-
 import re
-
 import datetime
-
 import tempfile
-
 import base64
-
-import pandas as pd
-
-import joblib
-
-import numpy as np
-
-from pdf2image import convert_from_path
-
-import pytesseract
-
-from pymongo import MongoClient
-
-from sentence_transformers import SentenceTransformer
-
-from huggingface_hub import InferenceClient
-
-from pyvis.network import Network
 
 from dotenv import load_dotenv
 
-
-
-# Load .env file from the same directory as utils.py
-
+# ── Lightweight setup (runs instantly) ──────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
-
-
-# Update this path to where you installed Tesseract on your PC
-
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-# Update this to your Poppler bin folder
-
-POPPLER_PATH = r"C:\poppler\poppler-24.08.0\Library\bin"
-
-
-
 # =========================================================
-
 # 1. GLOBAL CONFIGURATION & SETUP
-
 # =========================================================
 
 HF_TOKEN = os.environ.get("HF_TOKEN")
-
 MONGO_URI = os.environ.get("MONGO_URI")
 
-
-
 # Models
-
 EXTRACTOR_MODEL = "meta-llama/Llama-3.3-70B-Instruct:novita"
-
 SCRIBE_MODEL = "meta-llama/Llama-3.3-70B-Instruct:novita"
-
 CHAT_MODEL = "meta-llama/Llama-3.3-70B-Instruct:novita"
-
 VISION_MODEL = "Qwen/Qwen2.5-VL-7B-Instruct:hyperbolic"
 
+# ── Lazy-loaded heavy dependencies ──────────────────────────────────────────
+# These are deferred so uvicorn can bind the port instantly on Render.
 
+_pd = None
+def get_pd():
+    global _pd
+    if _pd is None:
+        import pandas as _pandas
+        _pd = _pandas
+    return _pd
 
-# Initialize Clients
+_np = None
+def get_np():
+    global _np
+    if _np is None:
+        import numpy as _numpy
+        _np = _numpy
+    return _np
 
-llm_client = InferenceClient(api_key=HF_TOKEN)
+_joblib = None
+def get_joblib():
+    global _joblib
+    if _joblib is None:
+        import joblib as _jl
+        _joblib = _jl
+    return _joblib
 
-mongo_client = MongoClient(MONGO_URI)
+_pytesseract = None
+def get_pytesseract():
+    global _pytesseract
+    if _pytesseract is None:
+        import pytesseract as _pt
+        if os.name == 'nt':
+            _pt.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+        _pytesseract = _pt
+    return _pytesseract
 
-db = mongo_client["healthlink_db"]
+POPPLER_PATH = r"C:\poppler\poppler-24.08.0\Library\bin" if os.name == 'nt' else None
 
-embed_model = SentenceTransformer('all-MiniLM-L6-v2')
+_convert_from_path = None
+def get_convert_from_path():
+    global _convert_from_path
+    if _convert_from_path is None:
+        from pdf2image import convert_from_path as _cfp
+        _convert_from_path = _cfp
+    return _convert_from_path
 
+_llm_client = None
+def get_llm_client():
+    global _llm_client
+    if _llm_client is None:
+        from huggingface_hub import InferenceClient
+        _llm_client = InferenceClient(api_key=HF_TOKEN)
+    return _llm_client
 
+_mongo_client = None
+_db = None
+def get_db():
+    global _mongo_client, _db
+    if _db is None:
+        from pymongo import MongoClient
+        _mongo_client = MongoClient(MONGO_URI)
+        _db = _mongo_client["healthlink_db"]
+    return _db
 
-# Load ML Model Globally
+_embed_model = None
+def get_embed_model():
+    global _embed_model
+    if _embed_model is None:
+        print("⏳ First request: Loading SentenceTransformer model...")
+        from sentence_transformers import SentenceTransformer
+        _embed_model = SentenceTransformer('all-MiniLM-L6-v2')
+    return _embed_model
 
-try:
-
-    rf_model = joblib.load('risk_model_multi.pkl')
-
-    rf_features = joblib.load('features_list.pkl')
-
-    print("✅ Successfully loaded Agiless Multi-Output Risk Model!")
-
-except Exception as e:
-
-    print(f"⚠️ Warning: Could not load model files. Error: {e}")
+# ML Risk Model (lazy)
+_rf_model = None
+_rf_features = None
+def get_risk_model():
+    global _rf_model, _rf_features
+    if _rf_model is None:
+        try:
+            _rf_model = get_joblib().load(os.path.join(BASE_DIR, 'risk_model_multi.pkl'))
+            _rf_features = get_joblib().load(os.path.join(BASE_DIR, 'features_list.pkl'))
+            print("✅ Successfully loaded Agiless Multi-Output Risk Model!")
+        except Exception as e:
+            print(f"⚠️ Warning: Could not load model files. Error: {e}")
+            _rf_model = False  # sentinel so we don't retry
+    return _rf_model, _rf_features
 
 
 
@@ -126,13 +139,13 @@ def OCR_EXTRACTION(input_dir):
 
             with tempfile.TemporaryDirectory() as temp_path:
 
-                images = convert_from_path(os.path.join(input_dir, pdf_name), dpi=500, poppler_path=POPPLER_PATH)
+                images = get_convert_from_path()(os.path.join(input_dir, pdf_name), dpi=500, poppler_path=POPPLER_PATH)
 
                 report_text = ""
 
                 for i, img in enumerate(images):
 
-                    page_text = pytesseract.image_to_string(img, config=r'--psm 6')
+                    page_text = get_pytesseract().image_to_string(img, config=r'--psm 6')
 
                     report_text += f"\n[DOC: {report_id} | PAGE: {i+1}]\n{page_text}"
 
@@ -212,11 +225,11 @@ def extract_structured_data(ocr_text):
 
     full_prompt = f"{STRICT_PROMPT}\n{ocr_text}\n[/INST]"
 
-    print("⏳ Calling LLM to extract JSON...")
+    # print("⏳ Calling LLM to extract JSON...")
 
     try:
 
-        completion = llm_client.chat.completions.create(
+        completion = get_llm_client().chat.completions.create(
 
             model=EXTRACTOR_MODEL,
 
@@ -272,7 +285,7 @@ def extract_from_image(image_path):
 
     try:
 
-        completion = llm_client.chat.completions.create(
+        completion = get_llm_client().chat.completions.create(
 
             model=VISION_MODEL,
 
@@ -349,7 +362,7 @@ def update_user_timeline(user_phone, parsed_json, doc_id):
     # Safe profile fetch
     patient_info = parsed_json.get("patient_info") or {}
     
-    db["users"].update_one(
+    get_db()["users"].update_one(
         {"_id": user_phone},
         {
             "$setOnInsert": {
@@ -383,7 +396,7 @@ def json_to_clinical_text(section_name, json_item, context_str):
 
     try:
 
-        completion = llm_client.chat.completions.create(model=SCRIBE_MODEL, messages=messages, max_tokens=150, temperature=0.1)
+        completion = get_llm_client().chat.completions.create(model=SCRIBE_MODEL, messages=messages, max_tokens=150, temperature=0.1)
 
         text = completion.choices[0].message.content.strip()
 
@@ -439,7 +452,7 @@ def update_vector_store(user_phone, parsed_json, doc_date):
 
             "text": s["text"],
 
-            "vector": embed_model.encode(s["text"]).tolist(),
+            "vector": get_embed_model().encode(s["text"]).tolist(),
 
             "metadata": s["meta"]
 
@@ -447,139 +460,12 @@ def update_vector_store(user_phone, parsed_json, doc_date):
 
 
 
-    db["vector_store"].delete_many({"user_id": user_phone, "date": doc_date})
+    get_db()["vector_store"].delete_many({"user_id": user_phone, "date": doc_date})
 
-    db["vector_store"].insert_many(vector_docs)
+    get_db()["vector_store"].insert_many(vector_docs)
 
     print(f"✅ Vectors Updated: Indexed {len(vector_docs)} clinical facts.")
 
-
-
-# =========================================================
-
-# 5. STEP 4: GENERATE PYVIS GRAPH
-
-# =========================================================
-# =========================================================
-# 5. STEP 4: GENERATE PYVIS GRAPH
-# =========================================================
-
-
-def generate_patient_graph(user_phone, output_file="healthlink_interactive.html"):
-    print(f"🕸️ Generating semantic graph for {user_phone}...")
-    user_doc = db["users"].find_one({"_id": user_phone})
-    if not user_doc:
-        print(f"❌ No data found for {user_phone}.")
-        return None
-
-    net = Network(height="100vh", width="100vw", bgcolor="#0b0f19", font_color="white", heading="HealthLink: Semantic Patient Knowledge Graph")
-    
-    # Enable native hover and dragging
-    net.set_options("""
-    {
-      "interaction": { "hover": true, "dragNodes": true, "zoomView": true }, 
-      "physics": {
-          "forceAtlas2Based": {"gravitationalConstant": -100, "centralGravity": 0.01, "springLength": 100},
-          "minVelocity": 0.75,
-          "solver": "forceAtlas2Based"
-      }
-    }
-    """)
-
-    profile = user_doc.get("profile", {})
-    patient_name = profile.get("full_name", "Unknown Patient")
-    p_age = profile.get("age", "N/A")
-    p_gender = profile.get("gender", "N/A")
-
-    # 🔥 FIX 1: Plain text Patient Tooltip
-    patient_tooltip = f"👤 PATIENT PROFILE\n====================\nName: {patient_name}\nAge: {p_age}\nGender: {p_gender}\nID: {user_phone}"
-    net.add_node(patient_name, label=patient_name, title=patient_tooltip, color="#ef4444", size=40, shape="diamond")
-    
-    timeline = user_doc.get("timeline", {})
-    color_map = {"Diagnosis": "#f97316", "Medication": "#06b6d4", "Vital": "#a855f7", "Other": "#8b5cf6"}
-
-    for date_str in sorted(timeline.keys()):
-        data = timeline[date_str]
-        hospital = data.get("meta", {}).get("primary_hospital", "Unknown Hospital")
-        date_node_id = f"DATE_{date_str}"
-        
-        # 🔥 FIX 2: Plain text Date Tooltip
-        date_tooltip = f"🏥 VISIT DETAILS\n--------------------\nDate: {date_str}\nFacility: {hospital}"
-        
-        net.add_node(date_node_id, label=date_str, title=date_tooltip, color="#eab308", size=25, shape="hexagon")
-        net.add_edge(patient_name, date_node_id, color="#475569", width=2)
-
-        categorized = {}
-        for ev in data.get("clinical_events", []):
-            if isinstance(ev, dict):
-                categorized.setdefault(ev.get("category", "Other"), []).append(ev)
-
-        for category, items in categorized.items():
-            cat_node_id = f"CAT_{date_str}_{category}"
-            cat_color = color_map.get(category, "#ffffff")
-            net.add_node(cat_node_id, label=category, color=cat_color, size=15, shape="box")
-            net.add_edge(date_node_id, cat_node_id, color="#475569", width=1, dashes=True)
-            
-            for item in items:
-                item_name = str(item.get("item", "Unknown")).upper()
-                global_item_id = f"GLOBAL_{category}{item_name}{date_str}"
-                
-                # 🔥 FIX 3: Plain text Item Tooltip with bullet points
-                hover_details = "\n".join([f"• {k.title()}: {v}" for k, v in item.items() if k not in ["category", "item", "source_doc_id"]])
-                item_tooltip = f"📌 {item_name}\n--------------------\n{hover_details}"
-                
-                net.add_node(global_item_id, label=item_name, title=item_tooltip, color=cat_color, size=12, shape="dot")
-                net.add_edge(cat_node_id, global_item_id, color=cat_color, width=1.5)
-
-    net.save_graph(output_file)
-
-    # Clean, lightweight JS just for the neighbor highlight (no tooltip hijacking!)
-    safe_injection = """
-    <script type="text/javascript">
-        network.on("hoverNode", function (params) {
-            try {
-                network.canvas.body.container.style.cursor = 'pointer';
-                var hover_id = params.node;
-                var connected_nodes = network.getConnectedNodes(hover_id);
-                connected_nodes.push(hover_id);
-                
-                var updateArray = [];
-                nodes.forEach(function(node) {
-                    if (!node.hiddenColor) { node.hiddenColor = node.color; }
-                    if (connected_nodes.includes(node.id)) {
-                        updateArray.push({id: node.id, color: node.hiddenColor, font: {color: 'white'}});
-                    } else {
-                        updateArray.push({id: node.id, color: 'rgba(50,50,50,0.3)', font: {color: 'rgba(50,50,50,0.3)'}});
-                    }
-                });
-                nodes.update(updateArray);
-            } catch (err) { }
-        });
-
-        network.on("blurNode", function (params) {
-            try {
-                network.canvas.body.container.style.cursor = 'default';
-                var updateArray = [];
-                nodes.forEach(function(node) {
-                    if (node.hiddenColor) {
-                        updateArray.push({id: node.id, color: node.hiddenColor, font: {color: 'white'}});
-                    }
-                });
-                nodes.update(updateArray);
-            } catch (err) { }
-        });
-    </script>
-    """
-    
-    with open(output_file, "r+", encoding="utf-8") as f:
-        html_content = f.read()
-        html_content = html_content.replace("</body>", safe_injection + "\n</body>")
-        f.seek(0)
-        f.write(html_content)
-        f.truncate()
-
-    print(f"🎉 Fully Styled Graph saved to {output_file}")
-    return output_file
 # =========================================================
 
 # 6. STEP 5: RAG CHATBOT ENGINE
@@ -588,7 +474,7 @@ def generate_patient_graph(user_phone, output_file="healthlink_interactive.html"
 
 def get_medical_context(query, user_phone):
 
-    query_vector = embed_model.encode(query).tolist()
+    query_vector = get_embed_model().encode(query).tolist()
 
     pipeline = [
 
@@ -612,7 +498,7 @@ def get_medical_context(query, user_phone):
 
     ]
 
-    results = list(db["vector_store"].aggregate(pipeline))
+    results = list(get_db()["vector_store"].aggregate(pipeline))
 
     if not results: return None
 
@@ -638,7 +524,7 @@ def ask_healthlink(user_query, user_phone,nameee="Agiless"):
 
     # 1. Fetch the user's static profile directly from MongoDB
 
-    user_doc = db["users"].find_one({"_id": user_phone})
+    user_doc = get_db()["users"].find_one({"_id": user_phone})
 
     patient_name = "Unknown"
 
@@ -726,7 +612,7 @@ def ask_healthlink(user_query, user_phone,nameee="Agiless"):
 
     try:
 
-        completion = llm_client.chat.completions.create(model=CHAT_MODEL, messages=messages, max_tokens=800, temperature=0.1)
+        completion = get_llm_client().chat.completions.create(model=CHAT_MODEL, messages=messages, max_tokens=800, temperature=0.1)
 
         raw_ans = completion.choices[0].message.content
 
@@ -808,13 +694,14 @@ def process_real_smartwatch_data(user_phone, raw_data_dict):
 
     # 1. Prepare DataFrame
 
-    df_full = pd.DataFrame(weekly_data_list)
+    df_full = get_pd().DataFrame(weekly_data_list)
 
 
 
     # 2. Handle missing features strictly based on features_list.pkl
 
-    for feat in rf_features:
+    _, _rf_feats = get_risk_model()
+    for feat in _rf_feats:
 
         if feat not in df_full.columns:
 
@@ -824,9 +711,10 @@ def process_real_smartwatch_data(user_phone, raw_data_dict):
 
     # 3. Predict Probabilities
 
-    test_data_prepared = df_full[rf_features]
+    _rf_mod, _rf_feats2 = get_risk_model()
+    test_data_prepared = df_full[_rf_feats2]
 
-    probs = rf_model.predict_proba(test_data_prepared)
+    probs = _rf_mod.predict_proba(test_data_prepared)
 
 
 
@@ -974,11 +862,11 @@ def process_real_smartwatch_data(user_phone, raw_data_dict):
 
     update_vector_store(user_phone, simulated_json, doc_date)
 
-    graph_file = generate_patient_graph(user_phone)
+    # Graph is now handled by Neo4j (via /api/graph-html)
 
 
 
-    print(f"🎉 ML Data fully integrated! Graph updated and saved to {graph_file}")
+    print(f"🎉 ML Data fully integrated!")
 
 
 
@@ -1007,10 +895,10 @@ def process_medical_file(user_phone: str, file_path: str):
         doc_id = os.path.splitext(os.path.basename(file_path))[0]
         
         try:
-            images = convert_from_path(file_path, dpi=500, poppler_path=POPPLER_PATH)
+            images = get_convert_from_path()(file_path, dpi=500, poppler_path=POPPLER_PATH)
             report_text = ""
             for i, img in enumerate(images):
-                page_text = pytesseract.image_to_string(img, config=r'--psm 6')
+                page_text = get_pytesseract().image_to_string(img, config=r'--psm 6')
                 report_text += f"\n[DOC: {doc_id} | PAGE: {i+1}]\n{page_text}"
             
             parsed_json = extract_structured_data(report_text)
@@ -1039,7 +927,7 @@ def process_medical_file(user_phone: str, file_path: str):
         print(f"💾 Pushing {doc_id} data to MongoDB and updating Graph...")
         doc_date = update_user_timeline(user_phone, parsed_json, doc_id)
         update_vector_store(user_phone, parsed_json, doc_date)
-        generate_patient_graph(user_phone) 
+        # Graph is now handled by Neo4j (via /api/graph-html)
         
         return {
             "status": "success", 

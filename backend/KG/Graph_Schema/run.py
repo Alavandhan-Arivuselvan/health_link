@@ -10,6 +10,13 @@ import json
 from pathlib import Path
 from datetime import datetime
 
+# Fix SSL cert verification (Windows machines with incomplete cert stores)
+try:
+    import certifi
+    os.environ.setdefault('SSL_CERT_FILE', certifi.where())
+except ImportError:
+    pass
+
 
 # ─────────────────────────────────────────────
 # DISPLAY HELPERS

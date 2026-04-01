@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Body, UploadFile, File, Form, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -12,10 +12,48 @@ import json
 from utils import process_medical_file, start_interactive_chat
 
 # Add ontology directory to path so we can import ontology.py
-ONTOLOGY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ontology")
+_repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ONTOLOGY_DIR = os.path.join(_repo_dir, "ontology")
+if not os.path.exists(ONTOLOGY_DIR):
+    ONTOLOGY_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ontology")
+
 import sys as _sys
 _sys.path.insert(0, ONTOLOGY_DIR)
-from ontology import process_medical_report
+try:
+    from ontology import process_medical_report
+except ImportError:
+    print(f"⚠️  ontology not loaded. Path {ONTOLOGY_DIR} might be missing.")
+    def process_medical_report(*args, **kwargs): pass
+
+
+# ── GraphSchema / Neo4j (non-fatal — server works even if Neo4j is down) ──────
+try:
+    from neo4j_bridge import ingest_report_to_neo4j, ingest_scan_to_neo4j, get_graph_data
+    _NEO4J_BRIDGE = True
+    print("✅ neo4j_bridge loaded.")
+except Exception as _ne:
+    _NEO4J_BRIDGE = False
+    print(f"⚠️  neo4j_bridge not loaded: {_ne}")
+# ──────────────────────────────────────────────────────────────────────────────
+
+# ── GraphRag chatbot (non-fatal — falls back to error if unavailable) ─────────
+_GRAPHRAG_AVAILABLE = False
+try:
+    _repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    GRAPHRAG_DIR = os.path.join(_repo_dir, "KG", "GraphRag")
+    if not os.path.exists(GRAPHRAG_DIR):
+        GRAPHRAG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "KG", "GraphRag")
+    import sys as _sys2
+    _sys2.path.insert(0, GRAPHRAG_DIR)
+    from query_engine import query as graphrag_query, ConversationHistory
+    _GRAPHRAG_AVAILABLE = True
+    _user_conversations: dict[str, ConversationHistory] = {}  # per-user chat history
+    print("✅ GraphRag query engine loaded.")
+except Exception as _gre:
+    _GRAPHRAG_AVAILABLE = False
+    print(f"⚠️  GraphRag not loaded: {_gre}")
+    import traceback; traceback.print_exc()
+# ──────────────────────────────────────────────────────────────────────────────
 from twilio.rest import Client
 from supabase import create_client, Client as SupabaseClient
 import bcrypt
@@ -26,24 +64,27 @@ from dotenv import load_dotenv
 basedir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(basedir, ".env.local"))
 import pandas as pd
-import joblib
 import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-# Allow all origins for development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "HealthLink Backend Running"}
+
 # Twilio Configuration
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
-TWILIO_PHONE_NUMBER = "+16187013270"
+TWILIO_PHONE_NUMBER = "+19786919225"
 
 if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
     twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
@@ -73,15 +114,21 @@ stats_db = []
 
 # Ensure uploads directory exists
 UPLOAD_DIR = "doc"
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-model = joblib.load('risk_model_multi.pkl')
-features = joblib.load('features_list.pkl')
+_model = None
+_features = None
+def _get_risk_model():
+    global _model, _features
+    if _model is None:
+        import joblib
+        try:
+            _model = joblib.load(os.path.join(basedir, 'risk_model_multi.pkl'))
+            _features = joblib.load(os.path.join(basedir, 'features_list.pkl'))
+            print("✅ Risk model loaded")
+        except Exception as e:
+            _model = False
+            _features = []
+            print(f"⚠️ Risk model not loaded: {e}")
+    return _model, _features
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -285,8 +332,22 @@ def _background_process_and_update(report_id: str, user_phone: str, file_path: s
                 update_data["extracted_data"] = result.get("data", {})
             supabase.table("reports").update(update_data).eq("id", report_id).execute()
             print(f"✅ Report {report_id} updated: {metrics_count} metrics extracted.")
+
+            # ── Write to Neo4j knowledge graph (non-fatal) ────────────────────
+            if _NEO4J_BRIDGE:
+                try:
+                    ext = os.path.splitext(file_path)[1].lower()
+                    if ext in [".jpg", ".jpeg", ".png"]:
+                        ingest_scan_to_neo4j(file_path)
+                    else:
+                        ingest_report_to_neo4j(file_path)
+                except Exception as _neo_err:
+                    print(f"⚠️  Neo4j write failed (non-fatal): {_neo_err}")
+            # ──────────────────────────────────────────────────────────────────
         else:
-            supabase.table("reports").update({"status": "failed"}).eq("id", report_id).execute()
+            supabase.table("reports").update({
+                "status": "failed",
+            }).eq("id", report_id).execute()
             print(f"❌ Report {report_id} processing failed.")
     except Exception as e:
         print(f"❌ Background processing error for report {report_id}: {e}")
@@ -308,6 +369,15 @@ async def upload_file(file: UploadFile = File(...), user_phone: str = Form(""), 
     
     # Process in background so the response returns immediately
     background_tasks.add_task(process_medical_file, user_phone, file_path)
+
+    # Also ingest into Neo4j Knowledge Graph (non-fatal)
+    if _NEO4J_BRIDGE:
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in [".jpg", ".jpeg", ".png"]:
+            background_tasks.add_task(ingest_scan_to_neo4j, file_path)
+        else:
+            background_tasks.add_task(ingest_report_to_neo4j, file_path)
+
     return {"status": "processing", "filename": file.filename, "path": file_path, "message": "File uploaded. Processing in background."}
 
 
@@ -381,13 +451,14 @@ def calculate_weekly_risk(week_data):
     df = pd.DataFrame(week_data)
     
     # Fill missing RF features (Stress/Activity) with 0
-    for feat in features:
+    _m, _f = _get_risk_model()
+    for feat in _f:
         if feat not in df.columns:
             df[feat] = 0
             
     # Get probabilities from RF Model
     # probs shape: [target][row][class]
-    probs = model.predict_proba(df[features])
+    probs = _m.predict_proba(df[_f])
     
     # Calculate Mean Probabilities for the week
     heart_p = np.mean([p[1] for p in probs[0]])
@@ -435,9 +506,27 @@ def calculate_weekly_risk(week_data):
 def chat(payload: dict = Body(...)):
     user_phone = payload.get("user_phone", "")
     message = payload.get("message", "")
-    text = message.lower()
-    ans = start_interactive_chat(user_phone, text)
-    return {"reply": ans}
+
+    if not _GRAPHRAG_AVAILABLE:
+        return {"reply": "Chat is temporarily unavailable. GraphRag engine not loaded.", "mode": "error"}
+
+    # Get or create per-user conversation history
+    if user_phone not in _user_conversations:
+        _user_conversations[user_phone] = ConversationHistory()
+    history = _user_conversations[user_phone]
+
+    try:
+        result = graphrag_query(message, history)
+        return {
+            "reply": result["answer"],
+            "mode": result.get("mode", ""),
+            "entities": result.get("entities_matched", {}),
+            "graph_stats": result.get("graph_stats", {}),
+        }
+    except Exception as e:
+        print(f"❌ GraphRag error: {e}")
+        import traceback; traceback.print_exc()
+        return {"reply": f"Sorry, I encountered an error processing your question. Please try again.", "mode": "error"}
 
 @app.post("/save-stats")
 def save_stats(stats: dict):
@@ -466,9 +555,8 @@ async def get_stats(week_type: str):
 @app.post("/qr")
 def get_qr(payload: dict = Body(...)):
     user_phone = payload.get("user_phone", "")
-    # Generate a URL pointing to this user's health profile
-    qr_url = f"http://{os.environ.get('HOST_IP', '192.168.1.100')}:9000/profile/{user_phone}"
-    return {"url": qr_url, "user_phone": user_phone}
+    # QR encodes just the patient phone — session token is created at scan time
+    return {"url": user_phone, "user_phone": user_phone}
 
 @app.get("/profile/{phone}")
 def get_profile(phone: str):
@@ -554,28 +642,44 @@ def get_lab_history(user_phone: str):
 
     history: dict[str, list] = {}
 
-    for report in result.data:
+    print(f"[lab-history] Found {len(result.data)} processed reports for {user_phone}")
+
+    for idx, report in enumerate(result.data):
         report_date = report.get("uploaded_at", "")
 
         # Try ontology lab results first
         ontology = report.get("ontology_data") or {}
         lab_results = ontology.get("lab_results") or []
 
+        print(f"[lab-history] Report {idx}: ontology keys={list(ontology.keys()) if ontology else 'None'}, ontology labs={len(lab_results)}")
+
         # Fallback to extracted_data if ontology has nothing
         if not lab_results:
             extracted = report.get("extracted_data") or {}
             clinical = extracted.get("clinical_data") or {}
             lab_results = clinical.get("lab_reports") or []
+            print(f"[lab-history] Report {idx}: extracted keys={list(extracted.keys()) if extracted else 'None'}, clinical keys={list(clinical.keys()) if clinical else 'None'}, fallback labs={len(lab_results)}")
+            if lab_results:
+                print(f"[lab-history] Report {idx}: first lab sample={lab_results[0]}")
 
         for lab in lab_results:
             name = (lab.get("test_name") or lab.get("name") or "").strip()
             if not name:
                 continue
-            raw_value = lab.get("value") or lab.get("result") or ""
-            try:
-                numeric_value = float(str(raw_value))
-            except (ValueError, TypeError):
-                continue  # skip non-numeric
+            raw_value = str(lab.get("value") or lab.get("result") or "").strip()
+
+            # Extract numeric part — values may contain units like "126 mg/dL" or "6.4 %"
+            import re
+            num_match = re.match(r"^([+-]?\d+\.?\d*)", raw_value)
+            if not num_match:
+                print(f"[lab-history] Report {idx}: no number found in '{name}' = '{raw_value}'")
+                continue
+            numeric_value = float(num_match.group(1))
+
+            # Extract unit: use stored unit, or parse from value string
+            unit = lab.get("unit") or ""
+            if not unit and len(raw_value) > len(num_match.group(0)):
+                unit = raw_value[len(num_match.group(0)):].strip()
 
             key = name.lower()
             if key not in history:
@@ -583,9 +687,10 @@ def get_lab_history(user_phone: str):
             history[key].append({
                 "date": report_date,
                 "value": numeric_value,
-                "unit": lab.get("unit") or "",
+                "unit": unit,
             })
 
+    print(f"[lab-history] Final: {len(history)} unique tests")
     return {"status": "success", "history": history}
 
 
@@ -597,8 +702,19 @@ import subprocess
 
 # Add ML directory to path so we can import wear.py functions
 ML_DIR = os.path.join(os.path.dirname(basedir), "ML")
+if not os.path.exists(ML_DIR):
+    ML_DIR = os.path.join(basedir, "ML")
 sys.path.insert(0, ML_DIR)
-from wear import forecast_body_battery, calculate_sleep_streaks_and_nudges, generate_personalized_nudges, calculate_step_consistency
+
+try:
+    from wear import forecast_body_battery, calculate_sleep_streaks_and_nudges, generate_personalized_nudges, calculate_step_consistency
+except ImportError as _mle:
+    print(f"⚠️  ML modules not loaded: {_mle}")
+    # Mock functions to prevent crashing endpoints
+    def forecast_body_battery(*args, **kwargs): return {}
+    def calculate_sleep_streaks_and_nudges(*args, **kwargs): return {}
+    def generate_personalized_nudges(*args, **kwargs): return []
+    def calculate_step_consistency(*args, **kwargs): return {}
 
 FITBIT_JSON_PATH = os.path.join(ML_DIR, "fitbit_2weeks_data.json")
 
@@ -668,3 +784,266 @@ def refresh_fitbit_data():
         raise HTTPException(status_code=504, detail="Fetch timed out")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fetch error: {str(e)}")
+
+
+# ─────────────────────────────────────────────────────
+# NEO4J GRAPH API ENDPOINTS
+# ─────────────────────────────────────────────────────
+
+@app.get("/api/graph-data")
+def api_graph_data():
+    """Return all Neo4j nodes and relationships as JSON."""
+    if not _NEO4J_BRIDGE:
+        raise HTTPException(status_code=503, detail="Neo4j is not connected")
+    data = get_graph_data()
+    return data
+
+@app.get("/api/graph-html", response_class=HTMLResponse)
+def api_graph_html():
+    """Return a self-contained interactive vis.js graph page."""
+    if not _NEO4J_BRIDGE:
+        return HTMLResponse(content="<html><body style='background:#0B1120;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif'><h2>Neo4j is not connected</h2></body></html>")
+
+    return HTMLResponse(content="""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HealthLink Knowledge Graph</title>
+<script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0B1120; color: #E2E8F0; font-family: 'Inter', system-ui, sans-serif; }
+  #graph { width: 100vw; height: 100vh; }
+  #loading {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 16px; color: #94A3B8;
+  }
+  #legend {
+    position: absolute; top: 12px; left: 12px;
+    background: rgba(15,23,42,0.9); border: 1px solid #1E293B;
+    border-radius: 12px; padding: 12px 16px; font-size: 12px;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+  #stats {
+    position: absolute; bottom: 12px; left: 12px;
+    background: rgba(15,23,42,0.9); border: 1px solid #1E293B;
+    border-radius: 12px; padding: 10px 16px; font-size: 12px; color: #64748B;
+  }
+</style>
+</head>
+<body>
+<div id="graph"></div>
+<div id="loading">Loading graph data...</div>
+<div id="legend"></div>
+<div id="stats"></div>
+<script>
+const COLORS = {
+  PatientProfile: '#4FC3F7', Visit: '#81C784', MedicalData: '#FFB74D',
+  LabResult: '#EF5350', Prescription: '#BA68C8', Diagnosis: '#F06292',
+  TestType: '#4DD0E1', DrugType: '#AED581', DiagnosisType: '#FF8A65',
+  Scan: '#FFD54F', Finding: '#E57373', WearableLog: '#64B5F6',
+  Metric: '#4DB6AC', MetricType: '#7986CB', Unknown: '#90A4AE'
+};
+
+fetch('./graph-data')
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('loading').style.display = 'none';
+
+    const nodes = new vis.DataSet(data.nodes.map(n => ({
+      id: n.id, label: n.label,
+      color: { background: COLORS[n.group] || COLORS.Unknown, border: '#1E293B',
+               highlight: { background: '#fff', border: COLORS[n.group] || '#fff' }},
+      font: { color: '#E2E8F0', size: 12, face: 'Inter, system-ui' },
+      shape: n.group === 'PatientProfile' ? 'diamond' :
+             n.group === 'Visit' ? 'dot' :
+             ['TestType','DrugType','DiagnosisType','MetricType'].includes(n.group) ? 'triangle' : 'dot',
+      size: n.group === 'PatientProfile' ? 30 :
+            ['TestType','DrugType','DiagnosisType','Visit'].includes(n.group) ? 20 : 14,
+      title: Object.entries(n.properties).map(([k,v]) => k+': '+v).join('\\n'),
+    })));
+
+    const edges = new vis.DataSet(data.edges.map(e => ({
+      from: e.from, to: e.to, label: e.label,
+      color: { color: '#334155', highlight: '#94A3B8' },
+      font: { color: '#475569', size: 9, strokeWidth: 0 },
+      arrows: 'to', smooth: { type: 'curvedCW', roundness: 0.15 },
+    })));
+
+    const container = document.getElementById('graph');
+    const network = new vis.Network(container, { nodes, edges }, {
+      physics: { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -60, springLength: 120 }},
+      interaction: { hover: true, tooltipDelay: 100, zoomView: true },
+      layout: { improvedLayout: data.nodes.length < 200 },
+    });
+
+    // Legend
+    const groups = [...new Set(data.nodes.map(n => n.group))];
+    document.getElementById('legend').innerHTML = '<b style="color:#94A3B8">Node Types</b>' +
+      groups.map(g => '<div class="legend-item"><div class="legend-dot" style="background:' +
+        (COLORS[g]||COLORS.Unknown) + '"></div>' + g + '</div>').join('');
+
+    document.getElementById('stats').textContent =
+      data.nodes.length + ' nodes \u00b7 ' + data.edges.length + ' relationships';
+  })
+  .catch(err => {
+    document.getElementById('loading').textContent = 'Failed to load graph: ' + err.message;
+  });
+</script>
+</body>
+</html>
+""")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DOCTOR SESSION MANAGEMENT — QR-based temporary access (1 hour)
+# ══════════════════════════════════════════════════════════════════════════════
+
+import uuid
+from datetime import datetime as _dt, timedelta as _td
+
+# In-memory session store: { token: { patient_phone, doctor_license, expires_at } }
+_doctor_sessions: dict[str, dict] = {}
+DOCTOR_SESSION_TTL = _td(hours=1)
+
+
+def _cleanup_sessions():
+    """Remove expired sessions."""
+    now = _dt.utcnow()
+    expired = [t for t, s in _doctor_sessions.items() if s["expires_at"] < now]
+    for t in expired:
+        del _doctor_sessions[t]
+
+
+def _validate_session(token: str) -> dict:
+    """Validate a session token. Returns session dict or raises 401/403."""
+    _cleanup_sessions()
+    session = _doctor_sessions.get(token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Session expired or invalid. Please scan the QR code again.")
+    if session["expires_at"] < _dt.utcnow():
+        del _doctor_sessions[token]
+        raise HTTPException(status_code=401, detail="Session expired. Please scan the QR code again.")
+    return session
+
+
+@app.post("/api/doctor/scan")
+def doctor_scan(payload: dict = Body(...)):
+    """
+    Doctor scans patient QR code.
+    Expects: { patient_phone, doctor_license }
+    Returns: { token, patient_phone, expires_at, ttl_seconds }
+    """
+    patient_phone = payload.get("patient_phone", "").strip()
+    doctor_license = payload.get("doctor_license", "").strip()
+
+    if not patient_phone or not doctor_license:
+        raise HTTPException(status_code=400, detail="patient_phone and doctor_license are required")
+
+    # Verify patient exists in Supabase
+    try:
+        result = supabase.table("users").select("phone").eq("phone", patient_phone).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Patient not found")
+    except HTTPException:
+        raise
+    except Exception:
+        pass  # If Supabase is down, still allow (graceful)
+
+    # Create session token
+    token = str(uuid.uuid4())
+    expires_at = _dt.utcnow() + DOCTOR_SESSION_TTL
+
+    _doctor_sessions[token] = {
+        "patient_phone": patient_phone,
+        "doctor_license": doctor_license,
+        "expires_at": expires_at,
+        "created_at": _dt.utcnow(),
+    }
+
+    print(f"✅ Doctor session created: {doctor_license} → patient {patient_phone} (expires {expires_at})")
+
+    return {
+        "token": token,
+        "patient_phone": patient_phone,
+        "expires_at": expires_at.isoformat(),
+        "ttl_seconds": int(DOCTOR_SESSION_TTL.total_seconds()),
+    }
+
+
+@app.post("/api/doctor/patient-graph")
+def doctor_patient_graph(payload: dict = Body(...)):
+    """
+    Returns the patient's Neo4j graph data for the doctor.
+    Expects: { token }
+    """
+    token = payload.get("token", "")
+    session = _validate_session(token)
+
+    if not _NEO4J_BRIDGE:
+        raise HTTPException(status_code=503, detail="Neo4j is not connected")
+
+    data = get_graph_data()
+    remaining = int((session["expires_at"] - _dt.utcnow()).total_seconds())
+    return {"graph": data, "patient_phone": session["patient_phone"], "remaining_seconds": remaining}
+
+
+@app.post("/api/doctor/patient-chat")
+def doctor_patient_chat(payload: dict = Body(...)):
+    """
+    Doctor chats about a patient's health data using GraphRag.
+    Expects: { token, message }
+    """
+    token = payload.get("token", "")
+    message = payload.get("message", "")
+    session = _validate_session(token)
+
+    if not _GRAPHRAG_AVAILABLE:
+        return {"reply": "Chat is temporarily unavailable.", "mode": "error"}
+
+    # Use a doctor-specific conversation key so histories don't clash with patient's own chat
+    conv_key = f"doc_{session['doctor_license']}_{session['patient_phone']}"
+    if conv_key not in _user_conversations:
+        _user_conversations[conv_key] = ConversationHistory()
+    history = _user_conversations[conv_key]
+
+    try:
+        result = graphrag_query(message, history, role="doctor")
+        remaining = int((session["expires_at"] - _dt.utcnow()).total_seconds())
+        return {
+            "reply": result["answer"],
+            "mode": result.get("mode", ""),
+            "entities": result.get("entities_matched", {}),
+            "remaining_seconds": remaining,
+        }
+    except Exception as e:
+        print(f"❌ Doctor chat error: {e}")
+        import traceback; traceback.print_exc()
+        return {"reply": "Sorry, I encountered an error. Please try again.", "mode": "error"}
+
+
+@app.post("/api/doctor/session-status")
+def doctor_session_status(payload: dict = Body(...)):
+    """
+    Check if a doctor session is still valid.
+    Expects: { token }
+    Returns: { valid, remaining_seconds, patient_phone }
+    """
+    token = payload.get("token", "")
+    _cleanup_sessions()
+    session = _doctor_sessions.get(token)
+
+    if not session or session["expires_at"] < _dt.utcnow():
+        return {"valid": False, "remaining_seconds": 0, "patient_phone": ""}
+
+    remaining = int((session["expires_at"] - _dt.utcnow()).total_seconds())
+    return {
+        "valid": True,
+        "remaining_seconds": remaining,
+        "patient_phone": session["patient_phone"],
+    }
+

@@ -67,10 +67,10 @@ const LoginScreen = () => {
         <GradientBackground style={styles.container}>
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
                 <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                    {/* Logo / Brand */}
+                    {/* Brand */}
                     <View style={styles.brandArea}>
                         <View style={styles.logoCircle}>
-                            <Ionicons name="heart-half" size={36} color={theme.colors.accent} />
+                            <Ionicons name="heart-half" size={32} color={theme.colors.accent} />
                         </View>
                         <Text style={styles.brandName}>HealthLink</Text>
                         <Text style={styles.brandTagline}>Your health, connected</Text>
@@ -151,21 +151,19 @@ const styles = StyleSheet.create({
         marginBottom: theme.spacing.xl,
     },
     logoCircle: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        backgroundColor: theme.colors.glassBg,
-        borderWidth: 1.5,
-        borderColor: theme.colors.border,
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: 'rgba(0,201,167,0.1)',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: theme.spacing.m,
     },
     brandName: {
-        fontSize: 28,
+        fontSize: 30,
         fontWeight: '700',
         color: theme.colors.text,
-        letterSpacing: -0.5,
+        letterSpacing: -0.3,
     } as any,
     brandTagline: {
         fontSize: 14,
@@ -173,11 +171,9 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     card: {
-        backgroundColor: theme.colors.glassBg,
+        backgroundColor: theme.colors.bgCard,
         padding: theme.spacing.l,
-        borderRadius: theme.borderRadius.xl,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.m,
         ...theme.shadow.card,
     },
     title: {

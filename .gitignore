@@ -27,3 +27,6 @@ antlogy/Loinc_2.82
 ontology/Loinc_2.82
 backend/healthlink_interactive.html
 backend/uploads/
+
+KG/GraphRag/.env
+KG/GraphRag/__pycache__/

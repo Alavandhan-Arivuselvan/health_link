@@ -75,10 +75,10 @@ const QRScreen = () => {
             {/* QR Card */}
             <View style={styles.qrContainer}>
                 {qrUrl && Platform.OS !== 'web' && QRCode ? (
-                    <QRCode value={qrUrl} size={200} backgroundColor="#1A2332" color={theme.colors.accent} />
+                    <QRCode value={qrUrl} size={200} backgroundColor={theme.colors.bgCard} color={theme.colors.accent} />
                 ) : qrUrl ? (
                     <img
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}&bgcolor=1A2332&color=00D4AA`}
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrUrl)}&bgcolor=${theme.colors.bgCard.replace('#', '')}&color=00C9A7`}
                         alt="QR Code"
                         style={{ width: 200, height: 200, borderRadius: 12 } as any}
                     />
@@ -109,10 +109,8 @@ const styles = StyleSheet.create({
     headerIcon: {
         width: 60,
         height: 60,
-        borderRadius: 30,
-        backgroundColor: theme.colors.glassLight,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
+        borderRadius: 20,
+        backgroundColor: 'rgba(0,201,167,0.1)',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: theme.spacing.m,
@@ -131,13 +129,11 @@ const styles = StyleSheet.create({
     qrContainer: {
         backgroundColor: theme.colors.bgCard,
         padding: 24,
-        borderRadius: theme.borderRadius.xl,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
+        borderRadius: theme.borderRadius.m,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 24,
-        ...theme.shadow.glow,
+        ...theme.shadow.card,
     },
     urlBox: {
         backgroundColor: theme.colors.bgCard,
@@ -145,8 +141,6 @@ const styles = StyleSheet.create({
         borderRadius: theme.borderRadius.m,
         width: '100%',
         marginBottom: 20,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
     },
     urlLabel: {
         color: theme.colors.textMuted,
@@ -174,7 +168,7 @@ const styles = StyleSheet.create({
         backgroundColor: theme.colors.accent,
         paddingHorizontal: 28,
         paddingVertical: 12,
-        borderRadius: theme.borderRadius.m,
+        borderRadius: 999,
     },
     retryText: {
         color: theme.colors.bgDark,
@@ -188,8 +182,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 12,
         borderRadius: theme.borderRadius.m,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
     },
     refreshText: {
         color: theme.colors.accent,

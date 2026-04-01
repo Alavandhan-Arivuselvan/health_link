@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, ViewStyle, TextStyle } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme';
 
 interface Props {
@@ -23,49 +22,32 @@ const CustomButton: React.FC<Props> = ({
     textStyle,
     type = 'primary'
 }) => {
-    if (type === 'primary') {
-        return (
-            <TouchableOpacity
-                onPress={onPress}
-                disabled={disabled || loading}
-                activeOpacity={0.8}
-                style={[styles.wrapper, style]}
-            >
-                <LinearGradient
-                    colors={disabled ? ['#3A4A5A', '#3A4A5A'] : ['#00D4AA', '#00B894']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.gradient}
-                >
-                    {loading ? (
-                        <ActivityIndicator color={theme.colors.white} />
-                    ) : (
-                        <Text style={[styles.text, textStyle]}>{title}</Text>
-                    )}
-                </LinearGradient>
-            </TouchableOpacity>
-        );
-    }
+    const isPrimary = type === 'primary';
+    const isOutline = type === 'outline';
 
     return (
         <TouchableOpacity
-            style={[
-                styles.container,
-                type === 'outline' && styles.outline,
-                disabled && styles.disabled,
-                style
-            ]}
             onPress={onPress}
             disabled={disabled || loading}
-            activeOpacity={0.7}
+            activeOpacity={0.75}
+            style={[
+                styles.base,
+                isPrimary && styles.primary,
+                isOutline && styles.outline,
+                !isPrimary && !isOutline && styles.secondary,
+                disabled && styles.disabled,
+                style,
+            ]}
         >
             {loading ? (
-                <ActivityIndicator color={theme.colors.accent} />
+                <ActivityIndicator color={isPrimary ? theme.colors.bgDark : theme.colors.accent} />
             ) : (
                 <Text style={[
                     styles.text,
-                    type === 'outline' && styles.outlineText,
-                    textStyle
+                    isPrimary && styles.primaryText,
+                    isOutline && styles.outlineText,
+                    !isPrimary && !isOutline && styles.secondaryText,
+                    textStyle,
                 ]}>{title}</Text>
             )}
         </TouchableOpacity>
@@ -73,40 +55,43 @@ const CustomButton: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-    wrapper: {
-        marginVertical: theme.spacing.s,
-        borderRadius: theme.borderRadius.m,
-        overflow: 'hidden',
-        ...theme.shadow.card,
-    },
-    gradient: {
-        height: 52,
-        borderRadius: theme.borderRadius.m,
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingHorizontal: theme.spacing.l,
-    },
-    container: {
-        height: 52,
-        borderRadius: theme.borderRadius.m,
+    base: {
+        height: 48,
+        borderRadius: 999,
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: theme.spacing.l,
         marginVertical: theme.spacing.s,
+    },
+    primary: {
+        backgroundColor: theme.colors.accent,
     },
     outline: {
         borderWidth: 1.5,
-        borderColor: theme.colors.border,
+        borderColor: theme.colors.accent,
         backgroundColor: 'transparent',
     },
+    secondary: {
+        backgroundColor: theme.colors.bgCard,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+    },
     disabled: {
-        opacity: 0.5,
+        opacity: 0.45,
     },
     text: {
-        ...theme.typography.button,
+        fontSize: 16,
+        fontWeight: '700',
+        letterSpacing: 0.2,
+    } as any,
+    primaryText: {
+        color: theme.colors.bgDark,
     },
     outlineText: {
         color: theme.colors.accent,
+    },
+    secondaryText: {
+        color: theme.colors.text,
     },
 });
 
