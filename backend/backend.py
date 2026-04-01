@@ -764,6 +764,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "HealthLink Backend Running"}
+
 # Allow all origins for development
 app.add_middleware(
     CORSMiddleware,
