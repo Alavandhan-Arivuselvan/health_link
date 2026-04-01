@@ -81,7 +81,14 @@ mongo_client = MongoClient(MONGO_URI)
 
 db = mongo_client["healthlink_db"]
 
-embed_model = SentenceTransformer('all-MiniLM-L6-v2')
+_embed_model = None
+
+def get_embed_model():
+    global _embed_model
+    if _embed_model is None:
+        print("⏳ First request: Loading SentenceTransformer model...")
+        _embed_model = SentenceTransformer('all-MiniLM-L6-v2')
+    return _embed_model
 
 
 
@@ -438,7 +445,7 @@ def update_vector_store(user_phone, parsed_json, doc_date):
 
             "text": s["text"],
 
-            "vector": embed_model.encode(s["text"]).tolist(),
+            "vector": get_embed_model().encode(s["text"]).tolist(),
 
             "metadata": s["meta"]
 
@@ -460,7 +467,7 @@ def update_vector_store(user_phone, parsed_json, doc_date):
 
 def get_medical_context(query, user_phone):
 
-    query_vector = embed_model.encode(query).tolist()
+    query_vector = get_embed_model().encode(query).tolist()
 
     pipeline = [
 
