@@ -64,7 +64,6 @@ from dotenv import load_dotenv
 basedir = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(basedir, ".env.local"))
 import pandas as pd
-import joblib
 import numpy as np
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -122,14 +121,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-try:
-    model = joblib.load(os.path.join(basedir, 'risk_model_multi.pkl'))
-    features = joblib.load(os.path.join(basedir, 'features_list.pkl'))
-    print("✅ Risk model loaded")
-except Exception as e:
-    model = None
-    features = []
-    print(f"⚠️ Risk model not loaded: {e}")
+_model = None
+_features = None
+def _get_risk_model():
+    global _model, _features
+    if _model is None:
+        import joblib
+        try:
+            _model = joblib.load(os.path.join(basedir, 'risk_model_multi.pkl'))
+            _features = joblib.load(os.path.join(basedir, 'features_list.pkl'))
+            print("✅ Risk model loaded")
+        except Exception as e:
+            _model = False
+            _features = []
+            print(f"⚠️ Risk model not loaded: {e}")
+    return _model, _features
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -452,13 +458,14 @@ def calculate_weekly_risk(week_data):
     df = pd.DataFrame(week_data)
     
     # Fill missing RF features (Stress/Activity) with 0
-    for feat in features:
+    _m, _f = _get_risk_model()
+    for feat in _f:
         if feat not in df.columns:
             df[feat] = 0
             
     # Get probabilities from RF Model
     # probs shape: [target][row][class]
-    probs = model.predict_proba(df[features])
+    probs = _m.predict_proba(df[_f])
     
     # Calculate Mean Probabilities for the week
     heart_p = np.mean([p[1] for p in probs[0]])
