@@ -6,6 +6,7 @@ import DashboardScreen from '../screens/home/DashboardScreen';
 import ReportHistoryScreen from '../screens/home/ReportHistoryScreen';
 import ReportDetailScreen from '../screens/home/ReportDetailScreen';
 import FitbitInsightsScreen from '../screens/home/FitbitInsightsScreen';
+import LessonScreen from '../screens/home/LessonScreen';
 
 const Stack = createStackNavigator();
 
@@ -17,8 +18,10 @@ const DashboardStack = () => {
             <Stack.Screen name="ReportHistory" component={ReportHistoryScreen} />
             <Stack.Screen name="ReportDetail" component={ReportDetailScreen} />
             <Stack.Screen name="FitbitInsights" component={FitbitInsightsScreen} />
+            <Stack.Screen name="Lesson" component={LessonScreen} />
         </Stack.Navigator>
     );
 };
 
 export default DashboardStack;
+

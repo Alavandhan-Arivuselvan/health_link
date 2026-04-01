@@ -49,9 +49,7 @@ const RootNavigator = () => {
                         name="AppTabs"
                         component={AppTabs}
                         options={{
-                            headerShown: true,
-                            title: 'HealthLink',
-                            headerStyle: darkHeaderStyle,
+                            headerShown: false,
                         }}
                     />
                     <Stack.Screen
