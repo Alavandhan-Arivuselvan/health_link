@@ -1,0 +1,67 @@
+PATIENT MEDICAL REPORT
+======================
+
+Patient Name: Rahul Sharma
+Age: 32 years
+Sex: Male
+Date: 2026-03-28
+Report ID: MR-2026-0328
+
+LABORATORY RESULTS
+-------------------
+
+1. BLOOD SUGAR PANEL
+   - Fasting Blood Sugar: 142 mg/dL (Normal: 70-100 mg/dL) — HIGH
+   - Post Prandial Blood Sugar: 210 mg/dL (Normal: <140 mg/dL) — HIGH
+   - HbA1c: 7.2% (Normal: 4.0-5.6%) — HIGH
+
+2. LIPID PROFILE
+   - Total Cholesterol: 245 mg/dL (Normal: <200 mg/dL) — HIGH
+   - LDL Cholesterol: 165 mg/dL (Normal: <100 mg/dL) — HIGH
+   - HDL Cholesterol: 38 mg/dL (Normal: >40 mg/dL) — LOW
+   - Triglycerides: 198 mg/dL (Normal: <150 mg/dL) — HIGH
+
+3. COMPLETE BLOOD COUNT
+   - Hemoglobin: 13.8 g/dL (Normal: 13.5-17.5 g/dL) — NORMAL
+   - WBC Count: 7,200 /μL (Normal: 4,500-11,000 /μL) — NORMAL
+   - Platelet Count: 2.5 lakhs (Normal: 1.5-4.0 lakhs) — NORMAL
+
+4. KIDNEY FUNCTION
+   - Creatinine: 1.0 mg/dL (Normal: 0.7-1.3 mg/dL) — NORMAL
+   - Blood Urea: 28 mg/dL (Normal: 15-40 mg/dL) — NORMAL
+
+5. THYROID
+   - TSH: 5.8 mIU/L (Normal: 0.4-4.0 mIU/L) — SLIGHTLY HIGH
+
+VITALS
+------
+   - Blood Pressure: 138/88 mmHg (Normal: <120/80 mmHg) — HIGH
+   - Heart Rate: 82 bpm
+   - BMI: 28.4 (Overweight)
+   - SpO2: 98%
+
+DIAGNOSES
+----------
+   1. Type 2 Diabetes Mellitus (newly diagnosed)
+   2. Dyslipidemia
+   3. Pre-hypertension
+   4. Subclinical Hypothyroidism
+   5. Overweight (BMI 28.4)
+
+MEDICATIONS PRESCRIBED
+-----------------------
+   1. Metformin 500mg - Twice daily (for diabetes)
+   2. Atorvastatin 10mg - Once daily at night (for cholesterol)
+   3. Lifestyle modifications recommended
+
+DOCTOR'S NOTES
+--------------
+Patient advised to:
+- Reduce sugar and refined carb intake
+- Exercise 30 minutes daily (brisk walking recommended)
+- Follow up in 3 months with repeat labs
+- Monitor blood sugar at home weekly
+- Reduce salt intake for blood pressure management
+
+Dr. Anjali Mehta
+MD, Internal Medicine
