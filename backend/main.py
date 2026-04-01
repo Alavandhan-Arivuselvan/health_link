@@ -1,9 +1,6 @@
 from backend import app
 import uvicorn
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
 
 import os
 

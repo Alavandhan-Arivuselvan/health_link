@@ -40,12 +40,12 @@ load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 
 # Update this path to where you installed Tesseract on your PC
-
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-# Update this to your Poppler bin folder
-
-POPPLER_PATH = r"C:\poppler\poppler-24.08.0\Library\bin"
+if os.name == 'nt':
+    # Windows only - Render will ignore this and use standard Linux paths
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+    POPPLER_PATH = r"C:\poppler\poppler-24.08.0\Library\bin"
+else:
+    POPPLER_PATH = None  # Linux typically has poppler in the system path
 
 
 
@@ -89,9 +89,9 @@ embed_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 try:
 
-    rf_model = joblib.load('risk_model_multi.pkl')
+    rf_model = joblib.load(os.path.join(BASE_DIR, 'risk_model_multi.pkl'))
 
-    rf_features = joblib.load('features_list.pkl')
+    rf_features = joblib.load(os.path.join(BASE_DIR, 'features_list.pkl'))
 
     print("✅ Successfully loaded Agiless Multi-Output Risk Model!")
 
