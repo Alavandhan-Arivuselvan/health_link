@@ -4,8 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DashboardStack from './DashboardStack';
-import ChatScreen from '../screens/home/ChatScreen';
-import WebScreen from '../screens/home/WebScreen';
+import VisualizeScreen from '../screens/home/VisualizeScreen';
 import IngestScreen from '../screens/home/IngestScreen';
 import QRScreen from '../screens/home/QRScreen';
 import StatsScreen from '../screens/home/StatsScreen';
@@ -17,8 +16,7 @@ const Tab = createBottomTabNavigator();
 const getTabIcon = (routeName: string): keyof typeof Ionicons.glyphMap => {
     switch (routeName) {
         case 'Home': return 'home';
-        case 'Chat': return 'chatbubble';
-        case 'Web': return 'stats-chart';
+        case 'Web': return 'body';
         case 'Upload': return 'cloud-upload';
         case 'QR': return 'qr-code';
         case 'ScanQR': return 'scan';
@@ -72,8 +70,7 @@ const AppTabs = () => {
             ) : (
                 <>
                     <Tab.Screen name="Home" component={DashboardStack} options={{ tabBarLabel: 'Home' }} />
-                    <Tab.Screen name="Chat" component={ChatScreen} options={{ tabBarLabel: 'Chat' }} />
-                    <Tab.Screen name="Web" component={WebScreen} options={{ tabBarLabel: 'Visualize' }} />
+                    <Tab.Screen name="Web" component={VisualizeScreen} options={{ tabBarLabel: 'Visualize' }} />
                     <Tab.Screen name="Upload" component={IngestScreen} options={{ tabBarLabel: 'Upload' }} />
                     <Tab.Screen name="QR" component={QRScreen} options={{ tabBarLabel: 'QR' }} />
                     <Tab.Screen name="Stats" component={StatsScreen} options={{ tabBarLabel: 'Stats' }} />

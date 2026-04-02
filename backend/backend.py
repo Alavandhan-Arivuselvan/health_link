@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Body, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -80,6 +81,19 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"status": "ok", "message": "HealthLink Backend Running"}
+
+# ── Serve 3D Anatomical Viewer ────────────────────────────────────────────────
+_VISUAL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "visual")
+if os.path.isdir(_VISUAL_DIR):
+    app.mount("/visual", StaticFiles(directory=_VISUAL_DIR), name="visual")
+
+@app.get("/viewer")
+def serve_viewer():
+    """Serve the HealthLink 3D anatomical body viewer."""
+    viewer_html = os.path.join(_VISUAL_DIR, "healthlink-viewer", "index.html")
+    if os.path.exists(viewer_html):
+        return FileResponse(viewer_html, media_type="text/html")
+    return HTMLResponse(content="<h2>Viewer not found</h2>", status_code=404)
 
 # Twilio Configuration
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")

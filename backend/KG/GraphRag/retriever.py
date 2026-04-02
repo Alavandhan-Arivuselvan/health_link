@@ -11,7 +11,12 @@ All functions return plain Python dicts/lists — no Neo4j objects leak out.
 from neo4j import GraphDatabase
 from graphrag_config import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, MAX_HOPS, MAX_CONTEXT_NODES
 
-driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+driver = GraphDatabase.driver(
+    NEO4J_URI,
+    auth=(NEO4J_USER, NEO4J_PASSWORD),
+    keep_alive=True,
+    max_connection_lifetime=200
+)
 
 
 # ─────────────────────────────────────────────
@@ -373,16 +378,16 @@ def get_graph_summary() -> dict:
     with driver.session() as session:
         # Use independent subqueries so a missing label doesn't zero out everything
         counts = session.run("""
-            CALL {
+            CALL () {
                 MATCH (v:Visit) RETURN count(v) AS visits
             }
-            CALL {
+            CALL () {
                 MATCH (l:LabResult) RETURN count(l) AS labs
             }
-            CALL {
+            CALL () {
                 MATCH (s:Scan) RETURN count(s) AS scans
             }
-            CALL {
+            CALL () {
                 MATCH (m:Metric) RETURN count(m) AS metrics
             }
             RETURN visits, labs, scans, metrics

@@ -57,6 +57,7 @@ Diagnoses: {existing_diagnoses if existing_diagnoses != '[]' else '(none yet)'}
 - Normalize units: mg/dL, %, g/dL, mmHg
 - status: "normal" | "high" | "low" | "critical" — infer from value vs normal_range, or null
 - Report date to use for all entries: {report_date}
+- organ_mapping: Map any found diseases, symptoms, or medications to the relevant organ from this EXACT list ONLY: ["Heart", "Left Lung", "Right Lung", "Stomach", "Liver", "Intestines", "Pectorals", "Abdominals", "Trapezius", "Lats", "Glutes", "Left Shoulder", "Right Shoulder", "Left Arm", "Right Arm", "Left Forearm", "Right Forearm", "Left Thigh", "Right Thigh", "Left Calf", "Right Calf", "Left Foot", "Right Foot"]. Use keys "medications", "diagnostics", "other".
 
 ━━━ REPORT ━━━
 {report_text}
@@ -79,6 +80,13 @@ Diagnoses: {existing_diagnoses if existing_diagnoses != '[]' else '(none yet)'}
   "diagnoses": [
     {{"name": "Type 2 Diabetes Mellitus", "canonical_id": "type2_diabetes", "icd_code": "E11"}}
   ],
+  "organ_mapping": {{
+    "Heart": {{
+      "medications": ["Metoprolol"],
+      "diagnostics": ["Cardiomegaly"],
+      "other": []
+    }}
+  }},
   "raw_notes": "any date discrepancies or observations"
 }}
 """

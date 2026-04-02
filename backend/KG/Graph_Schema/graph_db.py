@@ -20,7 +20,12 @@ from config import NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD
 from datetime import datetime
 
 
-driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+driver = GraphDatabase.driver(
+    NEO4J_URI, 
+    auth=(NEO4J_USER, NEO4J_PASSWORD),
+    keep_alive=True,
+    max_connection_lifetime=200
+)
 
 
 # ─────────────────────────────────────────────

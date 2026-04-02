@@ -1,0 +1,24 @@
+{
+  "Heart": {
+    "medications": [
+      "Atorvastatin",
+      "Omega-3 Fatty Acids"
+    ],
+    "diagnostics": [
+      "Mixed Dyslipidaemia",
+      "Borderline Cardiovascular Risk",
+      "Normal sinus rhythm"
+    ],
+    "other": [
+      "Occasional chest heaviness on climbing stairs",
+      "Family history of myocardial infarction"
+    ]
+  },
+  "Abdominals": {
+    "medications": [],
+    "diagnostics": [
+      "Overweight"
+    ],
+    "other": []
+  }
+}

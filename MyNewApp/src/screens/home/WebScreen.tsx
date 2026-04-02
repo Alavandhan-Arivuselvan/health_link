@@ -1,54 +1,29 @@
 
 import React, { useRef, useState } from 'react';
-import { StyleSheet, Platform, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { StyleSheet, Platform, View, Text } from 'react-native';
 import { BASE_URL } from '../../config/host';
 import { theme } from '../../theme';
 import { Ionicons } from '@expo/vector-icons';
 
-const GRAPH_URL = `${BASE_URL}/api/graph-html`;
+const VIEWER_URL = `${BASE_URL}/viewer`;
 
 const WebScreen = () => {
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey] = useState(0);
   const webViewRef = useRef<any>(null);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    setRefreshKey(prev => prev + 1);
-    setTimeout(() => setRefreshing(false), 1500);
-  };
-
-  const RefreshButton = () => (
-    <TouchableOpacity
-      style={styles.refreshBtn}
-      onPress={handleRefresh}
-      activeOpacity={0.7}
-    >
-      {refreshing ? (
-        <ActivityIndicator size="small" color="#fff" />
-      ) : (
-        <Ionicons name="refresh" size={20} color="#fff" />
-      )}
-      <Text style={styles.refreshText}>
-        {refreshing ? 'Loading...' : 'Refresh Graph'}
-      </Text>
-    </TouchableOpacity>
-  );
 
   if (Platform.OS === 'web') {
     return (
       <View style={styles.container}>
         <iframe
           key={refreshKey}
-          src={`${GRAPH_URL}?t=${refreshKey}`}
+          src={`${VIEWER_URL}?t=${refreshKey}`}
           style={{
             position: 'absolute' as const,
             top: 0, left: 0, right: 0, bottom: 0,
             width: '100%', height: '100%', border: 'none',
           }}
-          title="HealthLink Knowledge Graph"
+          title="HealthLink Body Canvas"
         />
-        <RefreshButton />
       </View>
     );
   }
@@ -60,27 +35,31 @@ const WebScreen = () => {
         <WebView
           ref={webViewRef}
           key={refreshKey}
-          source={{ uri: `${GRAPH_URL}?t=${refreshKey}` }}
+          source={{ uri: `${VIEWER_URL}?t=${refreshKey}` }}
           style={{ flex: 1 }}
           javaScriptEnabled={true}
           domStorageEnabled={true}
+          allowsInlineMediaPlayback={true}
+          mixedContentMode="compatibility"
+          scalesPageToFit={true}
+          startInLoadingState={true}
+          allowsFullscreenVideo={false}
         />
-        <RefreshButton />
       </View>
     );
   } catch (e) {
     return (
       <View style={styles.fallback}>
         <View style={styles.iconCircle}>
-          <Ionicons name="stats-chart" size={36} color={theme.colors.accent} />
+          <Ionicons name="body" size={36} color={theme.colors.accent} />
         </View>
-        <Text style={styles.fallbackTitle}>Knowledge Graph</Text>
+        <Text style={styles.fallbackTitle}>Health Canvas</Text>
         <Text style={styles.fallbackText}>
-          Install react-native-webview to view the interactive graph on mobile.
+          Install react-native-webview to view the 3D anatomical model.
         </Text>
         <View style={styles.urlBox}>
-          <Text style={styles.urlLabel}>GRAPH URL</Text>
-          <Text style={styles.fallbackUrl} selectable>{GRAPH_URL}</Text>
+          <Text style={styles.urlLabel}>VIEWER URL</Text>
+          <Text style={styles.fallbackUrl} selectable>{VIEWER_URL}</Text>
         </View>
       </View>
     );
@@ -92,28 +71,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.bgDark,
   },
-  refreshBtn: {
-    position: 'absolute',
-    bottom: 100,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.accent,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    borderRadius: 28,
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  refreshText: {
-    color: theme.colors.bgDark,
-    fontSize: 14,
-    fontWeight: '600',
-  } as any,
   fallback: {
     flex: 1,
     justifyContent: 'center',

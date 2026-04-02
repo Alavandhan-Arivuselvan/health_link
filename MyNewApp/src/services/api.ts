@@ -77,6 +77,10 @@ export const statsAPI = {
     saveStats: (stats: any) => fetchClient('/save-stats', { method: 'POST', body: JSON.stringify(stats) }),
 };
 
+export const visualAPI = {
+    getBodyData: () => fetchClient('/visual/healthlink-viewer/data.json'),
+};
+
 export const reportsAPI = {
     /** Upload a file and create a report record in Supabase. */
     upload: (formData: FormData) => fetchClient('/upload-report', {
@@ -101,5 +105,6 @@ export default {
     ...doctorAPI,
     ...chatAPI,
     ...statsAPI,
+    ...visualAPI,
     ...reportsAPI,
 };

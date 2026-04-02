@@ -11,7 +11,41 @@ from pathlib import Path
 import graph_db
 from extractor import extract_medical_report, extract_scan_report
 from config import DATE_FORMAT
+import os
 
+ORGAN_MAPPING_FILE = Path(__file__).resolve().parent.parent.parent / "organ_mapping.json"
+VISUAL_DATA_FILE = Path(__file__).resolve().parent.parent.parent / "visual" / "healthlink-viewer" / "data.json"
+
+def _update_single_json_mapping(organ_mapping: dict, file_path: Path):
+    if not organ_mapping:
+        return
+    try:
+        data = {}
+        if file_path.exists():
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read().strip()
+                if content:
+                    data = json.loads(content)
+                
+        for organ, new_data in organ_mapping.items():
+            if organ not in data:
+                data[organ] = {"medications": [], "diagnostics": [], "other": []}
+            
+            for key in ["medications", "diagnostics", "other"]:
+                for item in new_data.get(key, []):
+                    if item not in data[organ][key]:
+                        data[organ][key].append(item)
+                    
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+            
+        print(f"  [OK] Updated organ mapping at {file_path.name}")
+    except Exception as e:
+        print(f"  [!] Failed to update organ mapping at {file_path.name}: {e}")
+
+def update_organ_mapping(organ_mapping: dict):
+    _update_single_json_mapping(organ_mapping, ORGAN_MAPPING_FILE)
+    _update_single_json_mapping(organ_mapping, VISUAL_DATA_FILE)
 
 # ─────────────────────────────────────────────
 # FILE READERS
@@ -139,6 +173,8 @@ def ingest_medical_report(file_path: str, date: str):
 
     if extracted.get("raw_notes"):
         print(f"\n  Notes: {extracted['raw_notes']}")
+
+    update_organ_mapping(extracted.get("organ_mapping", {}))
 
     print(f"\n✓ Medical report ingested for {date}")
     return extracted
