@@ -7,11 +7,17 @@
     "diagnostics": [
       "Mixed Dyslipidaemia",
       "Borderline Cardiovascular Risk",
-      "Normal sinus rhythm"
+      "Normal sinus rhythm",
+      "Systolic Blood Pressure",
+      "Diastolic Blood Pressure",
+      "Pulse Rate"
     ],
     "other": [
       "Occasional chest heaviness on climbing stairs",
-      "Family history of myocardial infarction"
+      "Family history of myocardial infarction",
+      "Breathlessness on moderate exertion",
+      "Mild Fatigue Secondary to Anaemia",
+      "Easy fatigability"
     ]
   },
   "Abdominals": {
@@ -20,5 +26,38 @@
       "Overweight"
     ],
     "other": []
+  },
+  "Intestines": {
+    "medications": [
+      "Ferrous Sulphate",
+      "Folic Acid",
+      "Vitamin C"
+    ],
+    "diagnostics": [
+      "Iron Deficiency Anaemia",
+      "Serum Iron",
+      "Total Iron Binding Capacity"
+    ],
+    "other": [
+      "Chronically inadequate iron intake"
+    ]
+  },
+  "Liver": {
+    "medications": [],
+    "diagnostics": [
+      "Serum Ferritin"
+    ],
+    "other": []
+  },
+  "Stomach": {
+    "medications": [
+      "Ferrous Sulphate",
+      "Folic Acid",
+      "Vitamin C"
+    ],
+    "diagnostics": [],
+    "other": [
+      "Upper GI endoscopy (recommended)"
+    ]
   }
 }

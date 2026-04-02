@@ -8,6 +8,7 @@ import {
     StatusBar,
     ActivityIndicator,
     Alert,
+    Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -201,20 +202,34 @@ const DashboardScreen = ({ navigation }: any) => {
             });
             if (result.canceled || !result.assets?.length) return;
 
-            const file = result.assets[0];
+            const pickedFile = result.assets[0];
             setUploading(true);
 
             const userPhone = (await AsyncStorage.getItem('user_phone')) || '';
             const formData = new FormData();
-            formData.append('file', {
-                uri: file.uri,
-                name: file.name || 'report.pdf',
-                type: file.mimeType || 'application/pdf',
-            } as any);
+
+            if (Platform.OS === 'web') {
+                // Web: must append an actual Blob/File, not a plain object
+                const nativeFile = (pickedFile as any).file;
+                if (nativeFile instanceof Blob) {
+                    formData.append('file', nativeFile, pickedFile.name || 'report.pdf');
+                } else {
+                    const resp = await fetch(pickedFile.uri);
+                    const blob = await resp.blob();
+                    formData.append('file', blob, pickedFile.name || 'report.pdf');
+                }
+            } else {
+                // Native: RN's FormData polyfill accepts { uri, name, type }
+                formData.append('file', {
+                    uri: pickedFile.uri,
+                    name: pickedFile.name || 'report.pdf',
+                    type: pickedFile.mimeType || 'application/pdf',
+                } as any);
+            }
             formData.append('user_phone', userPhone);
 
             await reportsAPI.upload(formData);
-            Alert.alert('Upload Started', `${file.name} is being processed.`);
+            Alert.alert('Upload Started', `${pickedFile.name} is being processed.`);
             setTimeout(() => { fetchRecent(); fetchHealthScore(); }, 1500);
         } catch (e: any) {
             Alert.alert('Upload Failed', e.message || 'Something went wrong');

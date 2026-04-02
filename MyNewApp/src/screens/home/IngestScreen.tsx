@@ -52,8 +52,9 @@ const IngestScreen = () => {
 
             if (Platform.OS === "web") {
                 const formData = new FormData();
-                if (selectedFile.file) {
-                    formData.append("file", selectedFile.file);
+                // Check instanceof to avoid sending "[object Object]" as string
+                if (selectedFile.file instanceof Blob) {
+                    formData.append("file", selectedFile.file, selectedFile.name);
                 } else {
                     const resp = await fetch(selectedFile.uri);
                     const blob = await resp.blob();

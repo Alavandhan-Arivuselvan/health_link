@@ -10,6 +10,7 @@ import {
     ActivityIndicator,
     Alert,
     RefreshControl,
+    Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,6 +19,16 @@ import { Ionicons } from '@expo/vector-icons';
 import GradientBackground from '../../components/GradientBackground';
 import { theme } from '../../theme';
 import { reportsAPI } from '../../services/api';
+import { BASE_URL } from '../../config/host';
+
+// Only import native upload on non-web platforms
+let uploadAsyncFn: any = null;
+let UploadType: any = null;
+if (Platform.OS !== 'web') {
+    const legacy = require('expo-file-system/legacy');
+    uploadAsyncFn = legacy.uploadAsync;
+    UploadType = legacy.FileSystemUploadType;
+}
 
 interface Report {
     id: string;
@@ -82,15 +93,50 @@ const ReportHistoryScreen = ({ navigation }: any) => {
 
             const userPhone = (await AsyncStorage.getItem('user_phone')) || '';
 
-            const formData = new FormData();
-            formData.append('file', {
-                uri: file.uri,
-                name: file.name || 'report.pdf',
-                type: file.mimeType || 'application/pdf',
-            } as any);
-            formData.append('user_phone', userPhone);
+            let status: number;
+            let body: string;
 
-            const res = await reportsAPI.upload(formData);
+            if (Platform.OS === 'web') {
+                // Web: use blob-based FormData
+                const formData = new FormData();
+                // file.file may exist but might not be a real File/Blob —
+                // check with instanceof to avoid sending "[object Object]"
+                const nativeFile = (file as any).file;
+                if (nativeFile instanceof Blob) {
+                    formData.append('file', nativeFile, file.name || 'report.pdf');
+                } else {
+                    const resp = await fetch(file.uri);
+                    const blob = await resp.blob();
+                    formData.append('file', blob, file.name || 'report.pdf');
+                }
+                formData.append('user_phone', userPhone);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+                const response = await fetch(`${BASE_URL}/upload-report`, {
+                    method: 'POST', body: formData, signal: controller.signal,
+                });
+                clearTimeout(timeoutId);
+                body = await response.text();
+                status = response.status;
+            } else {
+                // Native: use expo-file-system uploadAsync
+                const uploadResult = await uploadAsyncFn(
+                    `${BASE_URL}/upload-report`, file.uri, {
+                    fieldName: 'file', httpMethod: 'POST',
+                    uploadType: UploadType.MULTIPART,
+                    mimeType: file.mimeType || 'application/pdf',
+                    parameters: { user_phone: userPhone },
+                });
+                status = uploadResult.status;
+                body = uploadResult.body;
+            }
+
+            if (status !== 200) {
+                const err = JSON.parse(body || '{}');
+                Alert.alert('Upload Failed', err.detail || 'Server rejected the file');
+                return;
+            }
+
             Alert.alert('Upload Started', `${file.name} is being processed. Pull down to refresh.`);
 
             // Refresh the list after a brief delay

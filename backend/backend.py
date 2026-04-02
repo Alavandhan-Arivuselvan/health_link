@@ -78,6 +78,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Log 422 validation errors in detail to help debug
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    print(f"❌ 422 Validation Error on {request.method} {request.url}")
+    print(f"   Headers: content-type={request.headers.get('content-type', 'MISSING')}")
+    errors = []
+    for err in exc.errors():
+        print(f"   ➜ {err}")
+        # Convert to JSON-safe dict (ValueError in ctx isn't serializable)
+        safe_err = {k: str(v) if not isinstance(v, (str, int, float, bool, list, dict, type(None))) else v for k, v in err.items()}
+        if "ctx" in safe_err and isinstance(err.get("ctx"), dict):
+            safe_err["ctx"] = {k: str(v) for k, v in err["ctx"].items()}
+        errors.append(safe_err)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors},
+    )
+
 @app.get("/")
 def read_root():
     return {"status": "ok", "message": "HealthLink Backend Running"}
@@ -402,8 +423,21 @@ async def upload_report(
     background_tasks: BackgroundTasks = None,
 ):
     """Report upload — saves locally, creates Supabase report row, processes in background."""
-    if not (file.content_type.startswith("image/") or file.content_type == "application/pdf"):
-        raise HTTPException(status_code=400, detail="Invalid file type. Only PDF and Images are allowed.")
+    print(f"📤 /upload-report called: filename={file.filename}, content_type={file.content_type}, user_phone={user_phone}")
+
+    # Validate file type — accept by content_type OR by extension (mobile clients
+    # sometimes send application/octet-stream or None as the MIME type)
+    ct = (file.content_type or "").lower()
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    allowed_extensions = {".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp"}
+    is_valid = (
+        ct.startswith("image/")
+        or ct == "application/pdf"
+        or ct == "application/octet-stream"
+        or ext in allowed_extensions
+    )
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=f"Invalid file type '{ct}' / ext '{ext}'. Only PDF and Images are allowed.")
 
     # Save file locally
     file_path = os.path.join(UPLOAD_DIR, file.filename)
@@ -413,7 +447,7 @@ async def upload_report(
     # Create a report record in Supabase with status 'processing'
     report_id = str(uuid.uuid4())
     now_iso = dt.datetime.now(dt.timezone.utc).isoformat()
-    file_type = "pdf" if file.content_type == "application/pdf" else "image"
+    file_type = "pdf" if (ct == "application/pdf" or ext == ".pdf") else "image"
 
     report_row = {
         "id": report_id,
@@ -688,14 +722,23 @@ def get_lab_history(user_phone: str):
     if not supabase:
         raise HTTPException(status_code=500, detail="Database not configured")
 
-    result = (
-        supabase.table("reports")
-        .select("uploaded_at, ontology_data, extracted_data, status")
-        .eq("user_phone", user_phone)
-        .eq("status", "processed")
-        .order("uploaded_at", desc=False)
-        .execute()
-    )
+    # Retry logic for transient Supabase HTTP/2 connection drops
+    result = None
+    for attempt in range(3):
+        try:
+            result = (
+                supabase.table("reports")
+                .select("uploaded_at, ontology_data, extracted_data, status")
+                .eq("user_phone", user_phone)
+                .eq("status", "processed")
+                .order("uploaded_at", desc=False)
+                .execute()
+            )
+            break
+        except Exception as e:
+            print(f"⚠️ [lab-history] Supabase query failed (attempt {attempt+1}/3): {e}")
+            if attempt == 2:
+                raise HTTPException(status_code=502, detail="Database temporarily unavailable, please retry")
 
     history: dict[str, list] = {}
 
