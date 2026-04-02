@@ -11,6 +11,7 @@ import {
     StatusBar,
     ActivityIndicator,
     RefreshControl,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import GradientBackground from '../../components/GradientBackground';
@@ -989,9 +990,12 @@ const ReportDetailScreen = ({ navigation, route }: any) => {
                 <View style={{ width: 40 }} />
             </View>
 
+            <View style={{ flex: 1, overflow: Platform.OS === 'web' ? 'hidden' as any : undefined }}>
             <ScrollView
-                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12 }}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}
                 showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.accent} />
                 }
@@ -1109,6 +1113,7 @@ const ReportDetailScreen = ({ navigation, route }: any) => {
 
                 <View style={{ height: 30 }} />
             </ScrollView>
+            </View>
 
             {/* ── Info Modal ── */}
             <Modal visible={infoVisible} transparent animationType="slide" onRequestClose={() => setInfoVisible(false)}>
@@ -1117,11 +1122,14 @@ const ReportDetailScreen = ({ navigation, route }: any) => {
                     activeOpacity={1}
                     onPress={() => setInfoVisible(false)}
                 >
-                    <View style={{
-                        backgroundColor: theme.colors.bgCard,
-                        borderTopLeftRadius: 28, borderTopRightRadius: 28,
-                        padding: 24, paddingBottom: 40,
-                    }}>
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        style={{
+                            backgroundColor: theme.colors.bgCard,
+                            borderTopLeftRadius: 28, borderTopRightRadius: 28,
+                            padding: 24, paddingBottom: 40,
+                        }}
+                    >
                         <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: theme.colors.textMuted, alignSelf: 'center', marginBottom: 20, opacity: 0.4 }} />
                         <Text style={{ fontSize: 20, fontWeight: '800', color: theme.colors.text, marginBottom: 16 } as any}>
                             {infoName}
@@ -1164,7 +1172,7 @@ const ReportDetailScreen = ({ navigation, route }: any) => {
                                 </>
                             );
                         })()}
-                    </View>
+                    </TouchableOpacity>
                 </TouchableOpacity>
             </Modal>
         </GradientBackground>

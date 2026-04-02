@@ -56,7 +56,12 @@ const DoctorLoginScreen = () => {
                 await AsyncStorage.setItem('doctor_license', licenseNumber);
                 await AsyncStorage.setItem('doctor_phone', phone);
                 await AsyncStorage.setItem('user_role', 'doctor');
-                navigation.reset({ index: 0, routes: [{ name: 'AppTabs' as never }] });
+                const parent = navigation.getParent();
+                if (parent) {
+                    parent.reset({ index: 0, routes: [{ name: 'AppTabs' as never }] });
+                } else {
+                    navigation.reset({ index: 0, routes: [{ name: 'AppTabs' as never }] });
+                }
             } else {
                 Alert.alert('Verification Failed', response.data.message);
             }

@@ -67,7 +67,12 @@ const RegisterScreen = () => {
             const response = await authAPI.verifyOTP({ phone: formData.phone, otp });
             if (response.data.status === 'success') {
                 await AsyncStorage.setItem('user_phone', formData.phone);
-                navigation.reset({ index: 0, routes: [{ name: 'AppTabs' as never }] });
+                const parent = navigation.getParent();
+                if (parent) {
+                    parent.reset({ index: 0, routes: [{ name: 'AppTabs' as never }] });
+                } else {
+                    navigation.reset({ index: 0, routes: [{ name: 'AppTabs' as never }] });
+                }
             } else {
                 Alert.alert('Verification Failed', response.data.message);
             }

@@ -1,9 +1,7 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ChapterData } from '../data/mockLessons';
-
-const { width: SCREEN_W } = Dimensions.get('window');
 
 interface LearningPathProps {
     chapters: ChapterData[];
@@ -12,26 +10,29 @@ interface LearningPathProps {
 }
 
 const NODE_SIZE = 64;
-const CONTAINER_PADDING = 32;
-const AVAILABLE_WIDTH = SCREEN_W - CONTAINER_PADDING * 2;
 
 const LearningPath: React.FC<LearningPathProps> = ({ chapters, completedChapters, onChapterPress }) => {
+    const [containerWidth, setContainerWidth] = useState(0);
+
     return (
-        <View style={styles.container}>
+        <View
+            style={styles.container}
+            onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width - 32)}
+        >
             <Text style={styles.sectionTitle}>Your Learning Journey</Text>
             <Text style={styles.sectionSub}>
                 {completedChapters.length}/{chapters.length} chapters completed
             </Text>
 
             <View style={styles.pathContainer}>
-                {chapters.map((chapter, index) => {
+                {containerWidth > 0 && chapters.map((chapter, index) => {
                     const isCompleted = completedChapters.includes(chapter.id);
                     const previousCompleted = index === 0 || completedChapters.includes(chapters[index - 1].id);
                     const isCurrent = !isCompleted && previousCompleted;
 
-                    // Zigzag: alternate left and right, keeping nodes on screen
+                    // Zigzag: alternate left and right
                     const isLeft = index % 2 === 0;
-                    const nodeX = isLeft ? AVAILABLE_WIDTH * 0.15 : AVAILABLE_WIDTH * 0.50;
+                    const nodeX = isLeft ? containerWidth * 0.10 : containerWidth * 0.45;
 
                     return (
                         <View key={chapter.id}>
@@ -44,8 +45,8 @@ const LearningPath: React.FC<LearningPathProps> = ({ chapters, completedChapters
                                             borderColor: isCompleted || isCurrent ? '#00C9A7' : '#30363D',
                                             alignSelf: isLeft ? 'flex-start' : 'flex-end',
                                             marginLeft: isLeft ? nodeX + NODE_SIZE / 2 : undefined,
-                                            marginRight: !isLeft ? AVAILABLE_WIDTH - nodeX - NODE_SIZE / 2 : undefined,
-                                            width: Math.abs(AVAILABLE_WIDTH * 0.35),
+                                            marginRight: !isLeft ? containerWidth - nodeX - NODE_SIZE / 2 : undefined,
+                                            width: Math.abs(containerWidth * 0.35),
                                             transform: [{ rotate: isLeft ? '-30deg' : '30deg' }],
                                         },
                                     ]} />
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     pathContainer: {
-        overflow: 'hidden',
+        overflow: 'visible',
     },
     connectorWrap: {
         height: 32,

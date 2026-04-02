@@ -385,10 +385,8 @@ const styles = StyleSheet.create({
     metricsTag: { fontSize: 12, fontWeight: '700', color: theme.colors.accent } as any,
 
     bottomBar: {
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        paddingHorizontal: 16, paddingTop: 12, paddingBottom: 28,
-        backgroundColor: theme.colors.bgDark,
-        borderTopWidth: 1, borderTopColor: theme.colors.border,
+        position: 'absolute', bottom: 80, left: 0, right: 0,
+        paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12,
     },
     uploadBtn: { borderRadius: 999, overflow: 'hidden' },
     uploadGradient: {

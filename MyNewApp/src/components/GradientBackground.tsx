@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { View, StyleSheet, ViewStyle, Platform } from 'react-native';
 
 interface Props {
     children: React.ReactNode;
@@ -9,7 +9,11 @@ interface Props {
 
 const GradientBackground: React.FC<Props> = ({ children, style }) => {
     return (
-        <View style={[styles.container, style]}>
+        <View style={[
+            styles.container,
+            Platform.OS === 'web' && { height: '100%' as any },
+            style,
+        ]}>
             {children}
         </View>
     );
