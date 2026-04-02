@@ -819,6 +819,96 @@ except ImportError as _mle:
 GOOGLEFIT_JSON_PATH = os.path.join(ML_DIR, "googlefit_2weeks_data.json")
 
 
+@app.get("/api/daily-tasks/{user_phone}")
+def get_daily_tasks(user_phone: str):
+    """
+    Returns today's wearable metrics + extracted medications from the latest processed report
+    for the gamified homepage.
+    """
+    # 1. Get wearable data
+    steps_current = 0
+    sleep_hours = 0.0
+    resting_hr = 0
+    energy_level = "average"
+    
+    if os.path.exists(GOOGLEFIT_JSON_PATH):
+        try:
+            with open(GOOGLEFIT_JSON_PATH, "r", encoding="utf-8") as f:
+                full_data = json.load(f)
+                
+            days = full_data.get("days", {})
+            if days:
+                # get latest day
+                latest_date = sorted(days.keys())[-1]
+                day_data = days[latest_date]
+                steps_current = day_data.get("steps", 0)
+                resting_hr = day_data.get("resting_bpm", day_data.get("avg_bpm", 72))
+                sleep_obj = day_data.get("sleep", {})
+                sleep_hours = sleep_obj.get("hours_asleep", 0.0)
+                
+                # Get energy forecast to extract energy level
+                try:
+                    energy_forecast = forecast_body_battery(full_data)
+                    energy_level = energy_forecast.get("energy_level", "average")
+                except:
+                    pass
+        except Exception as e:
+            print(f"⚠️ Failed to read Google Fit data for daily tasks: {e}")
+
+    # 2. Get medications from reports
+    medications_list = []
+    if supabase:
+        try:
+            result = (
+                supabase.table("reports")
+                .select("ontology_data, extracted_data")
+                .eq("user_phone", user_phone)
+                .eq("status", "processed")
+                .order("uploaded_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if result.data:
+                latest_report = result.data[0]
+                ontology = latest_report.get("ontology_data") or {}
+                prescriptions = ontology.get("prescriptions") or []
+                
+                for p in prescriptions:
+                    med_str = f"{p.get('drug_name', '')} {p.get('dosage', '')}".strip()
+                    if med_str:
+                        medications_list.append(med_str)
+                
+                # Fallback to LLM clinical data if needed
+                if not medications_list:
+                    extracted = latest_report.get("extracted_data") or {}
+                    clinical = extracted.get("clinical_data") or {}
+                    meds = clinical.get("medications") or []
+                    for m in meds:
+                        med_str = f"{m.get('name', '')} {m.get('dosage', '')}".strip()
+                        if med_str:
+                            medications_list.append(med_str)
+        except Exception as e:
+            print(f"⚠️ Failed to fetch medications: {e}")
+
+    # Fallback mock medications if completely empty for prototype
+    if not medications_list:
+        medications_list = ["Vitamin D3 - 1000 IU", "Wait for report upload to see more"]
+
+    # Hr Status
+    hr_status = "normal"
+    if resting_hr < 50: hr_status = "low"
+    elif resting_hr > 100: hr_status = "high"
+
+    return {
+        "status": "success",
+        "steps": { "current": steps_current, "goal": 10000 },
+        "sleep": { "hours": round(sleep_hours, 1), "goal": 8 },
+        "heart_rate": { "resting_bpm": int(resting_hr), "status": hr_status },
+        "spo2": { "value": 98, "status": "normal" }, # Mock SpO2 since it's hard to get consistently
+        "medications": medications_list,
+        "energy_level": energy_level
+    }
+
 @app.get("/api/fitbit-insights")
 def get_fitbit_insights():
     """

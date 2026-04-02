@@ -99,6 +99,11 @@ export const reportsAPI = {
     labHistory: (userPhone: string) => fetchClient(`/api/lab-history/${encodeURIComponent(userPhone)}`, { method: 'GET' }),
 };
 
+export const homeAPI = {
+    getDailyTasks: (userPhone: string) =>
+        fetchClient(`/api/daily-tasks/${encodeURIComponent(userPhone)}`, { method: 'GET' }),
+};
+
 // Default export if needed, though we should prefer named exports
 export default {
     ...authAPI,
@@ -107,4 +112,5 @@ export default {
     ...statsAPI,
     ...visualAPI,
     ...reportsAPI,
+    ...homeAPI,
 };
